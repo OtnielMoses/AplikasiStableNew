@@ -1,6 +1,6 @@
-import 'dart:convert';
+
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import '../service/auth_service.dart';
 import '../widgets/app_form.dart';
 import '../widgets/app_navbar.dart';
 import 'landing_page_logged.dart';
@@ -16,10 +16,10 @@ class SignUpScreen extends StatefulWidget {
 class _SignUpScreenState extends State<SignUpScreen> {
   // Controller untuk ambil isi field
   final _firstNameCtrl = TextEditingController();
-  final _lastNameCtrl  = TextEditingController();
-  final _usernameCtrl  = TextEditingController();
-  final _emailCtrl     = TextEditingController();
-  final _passwordCtrl  = TextEditingController();
+  final _lastNameCtrl = TextEditingController();
+  final _usernameCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
 
   bool _isLoading = false;
   String? _errorMsg;
@@ -32,34 +32,23 @@ class _SignUpScreenState extends State<SignUpScreen> {
     });
 
     try {
-      final response = await http.post(
-        Uri.parse('http://10.0.2.2:8080/api/v1/auth/register'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'first_name': _firstNameCtrl.text.trim(),
-          'last_name' : _lastNameCtrl.text.trim(),
-          'username'  : _usernameCtrl.text.trim(),
-          'email'     : _emailCtrl.text.trim(),
-          'password'  : _passwordCtrl.text.trim(),
-        }),
+      final result = await AuthService.register(
+        username: _usernameCtrl.text.trim(),
+        email: _emailCtrl.text.trim(),
+        password: _passwordCtrl.text,
       );
 
-      final data = jsonDecode(response.body);
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        // Berhasil → pindah ke halaman logged
+      if (result['status'] == true) {
         if (mounted) {
           Navigator.pushReplacement(context,
               MaterialPageRoute(builder: (_) => const LandingPageLogged()));
         }
       } else {
-        // Gagal → tampilkan pesan error dari server
         setState(() {
-          _errorMsg = data['message'] ?? 'Registrasi gagal';
+          _errorMsg = result['message'] ?? 'Registrasi gagal';
         });
       }
     } catch (e) {
-      // Error koneksi
       setState(() {
         _errorMsg = 'Tidak dapat terhubung ke server';
       });
@@ -112,20 +101,31 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   const SizedBox(height: 30),
 
                   // Fields — sekarang pakai controller
-                  AppField(label: 'First Name', hint: 'John',
+                  AppField(
+                      label: 'First Name',
+                      hint: 'John',
                       controller: _firstNameCtrl),
                   const SizedBox(height: 16),
-                  AppField(label: 'Last Name', hint: 'Doe',
+                  AppField(
+                      label: 'Last Name',
+                      hint: 'Doe',
                       controller: _lastNameCtrl),
                   const SizedBox(height: 16),
-                  AppField(label: 'Username', hint: '@username',
+                  AppField(
+                      label: 'Username',
+                      hint: '@username',
                       controller: _usernameCtrl),
                   const SizedBox(height: 16),
-                  AppField(label: 'Email', hint: 'email@example.com',
+                  AppField(
+                      label: 'Email',
+                      hint: 'email@example.com',
                       controller: _emailCtrl),
                   const SizedBox(height: 16),
-                  AppField(label: 'Password', hint: '••••••••',
-                      obscure: true, controller: _passwordCtrl),
+                  AppField(
+                      label: 'Password',
+                      hint: '••••••••',
+                      obscure: true,
+                      controller: _passwordCtrl),
                   const SizedBox(height: 16),
 
                   // Pesan error
@@ -144,8 +144,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
                   const SizedBox(height: 16),
                   GestureDetector(
-                    onTap: () => Navigator.pushReplacement(context,
-                        MaterialPageRoute(builder: (_) => const SignInScreen())),
+                    onTap: () => Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const SignInScreen())),
                     child: const Text('Sudah punya akun? Sign In',
                         style: TextStyle(color: Colors.grey, fontSize: 13)),
                   ),

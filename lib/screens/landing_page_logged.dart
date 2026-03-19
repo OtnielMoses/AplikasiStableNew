@@ -51,16 +51,16 @@ class LandingPageLogged extends StatelessWidget {
                     const SizedBox(height: 30),
                     Padding(
                       padding: EdgeInsets.only(left: ResponsiveHelper.textLeft(context)),
-                      child: Column(
+                      child: const Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           GradientText('FORGE DISCIPLINE',
                               fontSize: 70,
-                              gradient: const LinearGradient(
+                              gradient: LinearGradient(
                                   colors: [Colors.grey, Colors.grey])),
                           GradientText('BUILD CONSISTENCY',
                               fontSize: 70,
-                              gradient: const LinearGradient(
+                              gradient: LinearGradient(
                                 begin: Alignment.topCenter,
                                 end: Alignment.bottomCenter,
                                 colors: [Colors.white, Color(0xFF253745), Color(0xFF11212d)],
