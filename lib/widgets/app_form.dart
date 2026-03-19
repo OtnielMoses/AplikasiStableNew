@@ -5,12 +5,14 @@ class AppField extends StatelessWidget {
   final String label;
   final String hint;
   final bool obscure;
+  final TextEditingController? controller;
 
   const AppField({
     super.key,
     required this.label,
     required this.hint,
     this.obscure = false,
+    this.controller,
   });
 
   @override
@@ -25,6 +27,7 @@ class AppField extends StatelessWidget {
                 fontWeight: FontWeight.w600)),
         const SizedBox(height: 6),
         TextField(
+          controller: controller,
           obscureText: obscure,
           style: const TextStyle(color: Colors.white),
           decoration: InputDecoration(
