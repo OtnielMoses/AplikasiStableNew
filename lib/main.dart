@@ -3,6 +3,7 @@ import 'Login/login_screen.dart';
 import 'Login/signin_screen.dart';
 import 'Login/signup_screen.dart';
 import 'Home/main_screen.dart';
+import 'Login/verif_email.dart';
 
 void main() {
   runApp(const MyApp());
@@ -25,6 +26,7 @@ class MyApp extends StatelessWidget {
         '/loginPassword': (context) => const LoginPasswordScreen(),
         '/signup': (context) => const SignUpScreen(),
         '/home': (context) => const MainScreen(),
+        '/verify-email': (context) => const VerifyEmailScreen(),
       },
     );
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class PersonalDetailsScreen extends StatefulWidget {
   const PersonalDetailsScreen({super.key});
@@ -11,14 +12,15 @@ class PersonalDetailsScreen extends StatefulWidget {
 
 class _PersonalDetailsScreenState extends State<PersonalDetailsScreen> {
   File? _profileImage;
-  String _name = "John Graham";
-  String _gender = "Male";
-  String _ageGroup = "35 - 44";
-  String _weight = "78 kg";
-  String _height = "175 cm";
-  String _fitnessLevel = "Beginner";
-  String _mainGoal = "Build Muscle";
-  String _workoutDays = "3 Days / Week";
+  String _name = "";
+  String _email = "";
+  String _gender = "";
+  String _ageGroup = "";
+  String _weight = "";
+  String _height = "";
+  String _fitnessLevel = "";
+  String _mainGoal = "";
+  String _workoutDays = "";
 
   final ImagePicker _picker = ImagePicker();
 
@@ -30,7 +32,8 @@ class _PersonalDetailsScreenState extends State<PersonalDetailsScreen> {
   }
 
   void _editText(String label, String currentValue, Function(String) onSave) {
-    TextEditingController controller = TextEditingController(text: currentValue);
+    TextEditingController controller =
+        TextEditingController(text: currentValue);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -41,7 +44,9 @@ class _PersonalDetailsScreenState extends State<PersonalDetailsScreen> {
           autofocus: true,
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel")),
           ElevatedButton(
             onPressed: () {
               if (controller.text.isNotEmpty) onSave(controller.text);
@@ -61,33 +66,43 @@ class _PersonalDetailsScreenState extends State<PersonalDetailsScreen> {
         title: const Text("Edit Gender"),
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          children: ["Male", "Female", "Other"].map((opt) => ListTile(
-            title: Text(opt),
-            onTap: () {
-              setState(() => _gender = opt);
-              Navigator.pop(context);
-            },
-          )).toList(),
+          children: ["Male", "Female", "Other"]
+              .map((opt) => ListTile(
+                    title: Text(opt),
+                    onTap: () {
+                      setState(() => _gender = opt);
+                      Navigator.pop(context);
+                    },
+                  ))
+              .toList(),
         ),
       ),
     );
   }
 
   void _editAgeGroup() {
-    final List<String> options = ["18 - 24", "25 - 34", "35 - 44", "45 - 54", "55+"];
+    final List<String> options = [
+      "18 - 24",
+      "25 - 34",
+      "35 - 44",
+      "45 - 54",
+      "55+"
+    ];
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text("Edit Age Group"),
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          children: options.map((opt) => ListTile(
-            title: Text(opt),
-            onTap: () {
-              setState(() => _ageGroup = opt);
-              Navigator.pop(context);
-            },
-          )).toList(),
+          children: options
+              .map((opt) => ListTile(
+                    title: Text(opt),
+                    onTap: () {
+                      setState(() => _ageGroup = opt);
+                      Navigator.pop(context);
+                    },
+                  ))
+              .toList(),
         ),
       ),
     );
@@ -101,56 +116,105 @@ class _PersonalDetailsScreenState extends State<PersonalDetailsScreen> {
         title: const Text("Edit Fitness Level"),
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          children: options.map((opt) => ListTile(
-            title: Text(opt),
-            onTap: () {
-              setState(() => _fitnessLevel = opt);
-              Navigator.pop(context);
-            },
-          )).toList(),
+          children: options
+              .map((opt) => ListTile(
+                    title: Text(opt),
+                    onTap: () {
+                      setState(() => _fitnessLevel = opt);
+                      Navigator.pop(context);
+                    },
+                  ))
+              .toList(),
         ),
       ),
     );
   }
 
   void _editMainGoal() {
-    final List<String> options = ["Build Muscle", "Lose Fat", "Increase Endurance", "Improve Flexibility"];
+    final List<String> options = [
+      "Build Muscle",
+      "Lose Fat",
+      "Increase Endurance",
+      "Improve Flexibility"
+    ];
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text("Edit Main Goal"),
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          children: options.map((opt) => ListTile(
-            title: Text(opt),
-            onTap: () {
-              setState(() => _mainGoal = opt);
-              Navigator.pop(context);
-            },
-          )).toList(),
+          children: options
+              .map((opt) => ListTile(
+                    title: Text(opt),
+                    onTap: () {
+                      setState(() => _mainGoal = opt);
+                      Navigator.pop(context);
+                    },
+                  ))
+              .toList(),
         ),
       ),
     );
   }
 
   void _editWorkoutDays() {
-    final List<String> options = ["1 Day / Week", "2 Days / Week", "3 Days / Week", "4 Days / Week", "5 Days / Week", "6 Days / Week", "7 Days / Week"];
+    final List<String> options = [
+      "1 Day / Week",
+      "2 Days / Week",
+      "3 Days / Week",
+      "4 Days / Week",
+      "5 Days / Week",
+      "6 Days / Week",
+      "7 Days / Week"
+    ];
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text("Edit Workout Days"),
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          children: options.map((opt) => ListTile(
-            title: Text(opt),
-            onTap: () {
-              setState(() => _workoutDays = opt);
-              Navigator.pop(context);
-            },
-          )).toList(),
+          children: options
+              .map((opt) => ListTile(
+                    title: Text(opt),
+                    onTap: () {
+                      setState(() => _workoutDays = opt);
+                      Navigator.pop(context);
+                    },
+                  ))
+              .toList(),
         ),
       ),
     );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    final prefs = await SharedPreferences.getInstance();
+    print("username: ${prefs.getString('username')}");
+    print("email: ${prefs.getString('email')}");
+    setState(() {
+      _name = prefs.getString('username') ?? "User";
+      _email = prefs.getString('email') ?? "";
+    });
+  }
+
+  Future<void> _logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+    if (mounted) {
+      Navigator.pushReplacementNamed(context, '/');
+    }
   }
 
   @override
@@ -161,7 +225,11 @@ class _PersonalDetailsScreenState extends State<PersonalDetailsScreen> {
         child: Column(
           children: [
             const SizedBox(height: 10),
-            const Align(alignment: Alignment.centerLeft, child: Text("Personal Details", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24))),
+            const Align(
+                alignment: Alignment.centerLeft,
+                child: Text("Personal Details",
+                    style:
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 24))),
             const SizedBox(height: 20),
             Center(
               child: GestureDetector(
@@ -174,17 +242,26 @@ class _PersonalDetailsScreenState extends State<PersonalDetailsScreen> {
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(30),
                         color: Colors.grey[800],
-                        image: _profileImage != null ? DecorationImage(image: FileImage(_profileImage!), fit: BoxFit.cover) : null,
+                        image: _profileImage != null
+                            ? DecorationImage(
+                                image: FileImage(_profileImage!),
+                                fit: BoxFit.cover)
+                            : null,
                       ),
-                      child: _profileImage == null ? const Icon(Icons.person, size: 80, color: Colors.white54) : null,
+                      child: _profileImage == null
+                          ? const Icon(Icons.person,
+                              size: 80, color: Colors.white54)
+                          : null,
                     ),
                     Positioned(
                       top: 0,
                       right: 0,
                       child: Container(
                         padding: const EdgeInsets.all(6),
-                        decoration: const BoxDecoration(color: Color(0xFFD4FF33), shape: BoxShape.circle),
-                        child: const Icon(Icons.edit_outlined, color: Colors.black, size: 20),
+                        decoration: const BoxDecoration(
+                            color: Color(0xFFD4FF33), shape: BoxShape.circle),
+                        child: const Icon(Icons.edit_outlined,
+                            color: Colors.black, size: 20),
                       ),
                     ),
                   ],
@@ -192,22 +269,54 @@ class _PersonalDetailsScreenState extends State<PersonalDetailsScreen> {
               ),
             ),
             const SizedBox(height: 40),
-            _buildDetailRow("Name", _name, onTap: () => _editText("Name", _name, (val) => setState(() => _name = val))),
+            _buildDetailRow("Name", _name,
+                onTap: () => _editText(
+                    "Name", _name, (val) => setState(() => _name = val))),
+            _buildDetailRow("Email", _email, onTap: () {}),
             _buildDetailRow("Gender", _gender, onTap: _editGender),
             _buildDetailRow("Age Group", _ageGroup, onTap: _editAgeGroup),
-            _buildDetailRow("Weight", _weight, onTap: () => _editText("Weight", _weight, (val) => setState(() => _weight = val))),
-            _buildDetailRow("Height", _height, onTap: () => _editText("Height", _height, (val) => setState(() => _height = val))),
-            _buildDetailRow("Fitness Level", _fitnessLevel, onTap: _editFitnessLevel),
+            _buildDetailRow("Weight", _weight,
+                onTap: () => _editText(
+                    "Weight", _weight, (val) => setState(() => _weight = val))),
+            _buildDetailRow("Height", _height,
+                onTap: () => _editText(
+                    "Height", _height, (val) => setState(() => _height = val))),
+            _buildDetailRow("Fitness Level", _fitnessLevel,
+                onTap: _editFitnessLevel),
             _buildDetailRow("Main Goal", _mainGoal, onTap: _editMainGoal),
-            _buildDetailRow("Workout Days", _workoutDays, onTap: _editWorkoutDays),
+            _buildDetailRow("Workout Days", _workoutDays,
+                onTap: _editWorkoutDays),
             const SizedBox(height: 20),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 55,
+              child: ElevatedButton(
+                onPressed: _logout,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                child: const Text(
+                  "Log Out",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildDetailRow(String label, String value, {required VoidCallback onTap}) {
+  Widget _buildDetailRow(String label, String value,
+      {required VoidCallback onTap}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
       child: InkWell(
@@ -215,14 +324,19 @@ class _PersonalDetailsScreenState extends State<PersonalDetailsScreen> {
         borderRadius: BorderRadius.circular(16),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-          decoration: BoxDecoration(color: const Color(0xFF1F222A), borderRadius: BorderRadius.circular(16)),
+          decoration: BoxDecoration(
+              color: const Color(0xFF1F222A),
+              borderRadius: BorderRadius.circular(16)),
           child: Row(
             children: [
-              Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              Text(label,
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.bold)),
               const Spacer(),
               Text(value, style: const TextStyle(fontSize: 16)),
               const SizedBox(width: 8),
-              const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.white70),
+              const Icon(Icons.arrow_forward_ios,
+                  size: 16, color: Colors.white70),
             ],
           ),
         ),

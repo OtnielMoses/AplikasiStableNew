@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import '../config.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -9,11 +12,11 @@ class SignUpScreen extends StatefulWidget {
 
 class _SignUpScreenState extends State<SignUpScreen> {
   bool _obscurePassword = true;
+  bool _isLoading = false;
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  String? _selectedGender;
 
   @override
   void dispose() {
@@ -23,15 +26,53 @@ class _SignUpScreenState extends State<SignUpScreen> {
     super.dispose();
   }
 
-  void _signUp() {
-    if (_formKey.currentState!.validate() && _selectedGender != null) {
-      // Simulasi sign up sukses
-      Navigator.pushReplacementNamed(context, '/home');
-    } else if (_selectedGender == null) {
+  Future<void> _signUp() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final body = jsonEncode({
+        "username": _nameController.text.trim(),
+        "email": _emailController.text.trim(),
+        "password": _passwordController.text,
+      });
+
+      final response = await http
+          .post(
+            Uri.parse("${AppConfig.baseUrl}/auth/register"),
+            headers: {"Content-Type": "application/json"},
+            body: body,
+          )
+          .timeout(const Duration(seconds: 10));
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Akun berhasil dibuat!")),
+        );
+        await Future.delayed(const Duration(seconds: 1));
+        if (mounted)
+          Navigator.pushReplacementNamed(
+            context,
+            '/verify-email',
+            arguments:
+                _emailController.text.trim(), // ← kirim email ke verify screen
+          );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(data['message'] ?? "Terjadi kesalahan")),
+        );
+      }
+    } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Pilih gender terlebih dahulu")),
+        SnackBar(
+            content: Text("Error: ${e.toString()}")), // ← tampilkan error asli
       );
     }
+
+    if (mounted) setState(() => _isLoading = false);
   }
 
   @override
@@ -65,14 +106,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   ),
                 ),
                 const SizedBox(height: 40),
-                const Text("Name"),
+                const Text("Username"),
                 const SizedBox(height: 8),
                 _buildTextField(
                   controller: _nameController,
-                  hint: "Your name",
+                  hint: "Your username",
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return "Nama tidak boleh kosong";
+                      return "Username tidak boleh kosong";
                     }
                     return null;
                   },
@@ -117,55 +158,27 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 20),
-                const Text("Gender"),
-                Row(
-                  children: [
-                    Expanded(
-                      child: RadioListTile<String>(
-                        value: "Male",
-                        groupValue: _selectedGender,
-                        title: const Text("Male"),
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedGender = value;
-                          });
-                        },
-                      ),
-                    ),
-                    Expanded(
-                      child: RadioListTile<String>(
-                        value: "Female",
-                        groupValue: _selectedGender,
-                        title: const Text("Female"),
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedGender = value;
-                          });
-                        },
-                      ),
-                    ),
-                  ],
-                ),
                 const SizedBox(height: 30),
                 SizedBox(
                   width: double.infinity,
                   height: 60,
                   child: ElevatedButton(
-                    onPressed: _signUp,
+                    onPressed: _isLoading ? null : _signUp,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFD4FF33),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(30),
                       ),
                     ),
-                    child: const Text(
-                      "Sign Up",
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                    child: _isLoading
+                        ? const CircularProgressIndicator(color: Colors.black)
+                        : const Text(
+                            "Sign Up",
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -185,6 +198,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 24),
               ],
             ),
           ),
