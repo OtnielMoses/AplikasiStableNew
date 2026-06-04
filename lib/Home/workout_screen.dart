@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/workout_data.dart';
 
-// =============================== 1. SELECT DAY SCREEN ===============================
 class SelectDayScreen extends StatefulWidget {
   const SelectDayScreen({super.key});
 
@@ -11,12 +10,12 @@ class SelectDayScreen extends StatefulWidget {
 
 class _SelectDayScreenState extends State<SelectDayScreen> {
   final List<Map<String, dynamic>> days = const [
-    {"name": "Mon", "full": "Monday", "icon": Icons.sunny},
+    {"name": "Mon", "full": "Monday", "icon": Icons.wb_sunny},
     {"name": "Tue", "full": "Tuesday", "icon": Icons.wb_sunny},
     {"name": "Wed", "full": "Wednesday", "icon": Icons.cloud},
     {"name": "Thu", "full": "Thursday", "icon": Icons.wb_twilight},
     {"name": "Fri", "full": "Friday", "icon": Icons.weekend},
-    {"name": "Sat", "full": "Saturday", "icon": Icons.sports},
+    {"name": "Sat", "full": "Saturday", "icon": Icons.sports_gymnastics},
     {"name": "Sun", "full": "Sunday", "icon": Icons.bedtime},
   ];
 
@@ -41,23 +40,21 @@ class _SelectDayScreenState extends State<SelectDayScreen> {
       }
       map[day['full']] = found;
     }
-    setState(() {
-      workoutMap = map;
-    });
+    if (mounted) {
+      setState(() => workoutMap = map);
+    }
   }
 
-  Future<void> _refreshData() async {
-    await _loadWorkouts();
-  }
+  Future<void> _refreshData() async => _loadWorkouts();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F0F0F),
+      backgroundColor: const Color(0xFF0A0C10),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: const Text("Select Day", style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text("Select Day", style: TextStyle(fontWeight: FontWeight.w600, fontSize: 20)),
         centerTitle: true,
         automaticallyImplyLeading: false,
         actions: [
@@ -70,40 +67,48 @@ class _SelectDayScreenState extends State<SelectDayScreen> {
       body: RefreshIndicator(
         onRefresh: _refreshData,
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("Choose a day for your workout plan", style: TextStyle(fontSize: 16, color: Colors.white70)),
-              const SizedBox(height: 30),
+              const Text("Choose a day for your workout plan", style: TextStyle(fontSize: 14, color: Color(0xFF8E8E93))),
+              const SizedBox(height: 20),
               Expanded(
-                child: GridView.builder(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                    childAspectRatio: 0.85,
-                  ),
-                  itemCount: days.length,
-                  itemBuilder: (context, index) {
-                    final day = days[index];
-                    final fullName = day['full'];
-                    final workout = workoutMap[fullName];
-                    return _DayCard(
-                      dayName: day['name'],
-                      fullName: fullName,
-                      icon: day['icon'],
-                      workout: workout,
-                      onTap: () async {
-                        final result = await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => FilterScreen(selectedDay: fullName, existingWorkout: workout),
-                          ),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final crossAxisCount = constraints.maxWidth > 600 ? 3 : 2;
+                    return GridView.builder(
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: crossAxisCount,
+                        crossAxisSpacing: 14,
+                        mainAxisSpacing: 14,
+                        childAspectRatio: 0.85,
+                      ),
+                      itemCount: days.length,
+                      itemBuilder: (context, index) {
+                        final day = days[index];
+                        final fullName = day['full'];
+                        final workout = workoutMap[fullName];
+                        return _DayCard(
+                          dayName: day['name'],
+                          fullName: fullName,
+                          icon: day['icon'],
+                          workout: workout,
+                          onTap: () async {
+                            final result = await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => FilterScreen(
+                                  selectedDay: fullName,
+                                  existingWorkout: workout,
+                                ),
+                              ),
+                            );
+                            if (result == true) {
+                              await _loadWorkouts();
+                            }
+                          },
                         );
-                        if (result == true) {
-                          await _loadWorkouts(); // auto-reload setelah save
-                        }
                       },
                     );
                   },
@@ -138,11 +143,17 @@ class _DayCard extends StatelessWidget {
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFF1F222A),
-          borderRadius: BorderRadius.circular(24),
+          gradient: LinearGradient(
+            colors: workout != null
+                ? [const Color(0xFF1A1C24), const Color(0xFF23262F)]
+                : [const Color(0xFF12151C), const Color(0xFF1A1C24)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: workout != null ? const Color(0xFFD4FF33) : Colors.white10,
-            width: workout != null ? 2 : 1,
+            color: workout != null ? const Color(0xFFD4FF33) : const Color(0xFF2A2D35),
+            width: workout != null ? 1.5 : 1,
           ),
         ),
         child: Padding(
@@ -150,41 +161,49 @@ class _DayCard extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 36, color: workout != null ? const Color(0xFFD4FF33) : Colors.white54),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: workout != null ? const Color(0xFFD4FF33).withOpacity(0.15) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, size: 32, color: workout != null ? const Color(0xFFD4FF33) : const Color(0xFF6B6F7A)),
+              ),
               const SizedBox(height: 8),
               Text(dayName, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
-              const SizedBox(height: 4),
-              Text(fullName, style: const TextStyle(fontSize: 11, color: Colors.white54)),
+              const SizedBox(height: 2),
+              Text(fullName, style: const TextStyle(fontSize: 10, color: Color(0xFF8E8E93))),
               if (workout != null) ...[
                 const SizedBox(height: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFD4FF33).withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(12),
+                    color: const Color(0xFFD4FF33).withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
-                    "${workout!.bodyParts.length} parts • ${workout!.exercises.length} ex",
-                    style: const TextStyle(fontSize: 10, color: Color(0xFFD4FF33)),
+                    "${workout!.exercises.length} exercises",
+                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: Color(0xFFD4FF33)),
                   ),
                 ),
                 const SizedBox(height: 6),
-                Expanded(
+                Flexible(
                   child: SingleChildScrollView(
                     child: Column(
-                      children: workout!.exercises.map((ex) => Padding(
+                      children: workout!.exercises.take(2).map((ex) => Padding(
                         padding: const EdgeInsets.symmetric(vertical: 2),
                         child: Text(
-                          "• ${ex.name}",
-                          style: const TextStyle(fontSize: 9, color: Colors.white70),
+                          ex.name,
+                          style: const TextStyle(fontSize: 9, color: Color(0xFFB0B3B8)),
                           overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
                         ),
-                      )).take(3).toList(),
+                      )).toList(),
                     ),
                   ),
                 ),
-                if (workout!.exercises.length > 3)
-                  const Text("...", style: TextStyle(fontSize: 9, color: Colors.white54)),
+                if (workout!.exercises.length > 2)
+                  const Text("...", style: TextStyle(fontSize: 9, color: Color(0xFF6B6F7A))),
               ],
             ],
           ),
@@ -194,7 +213,6 @@ class _DayCard extends StatelessWidget {
   }
 }
 
-// =============================== 2. FILTER SCREEN ===============================
 class FilterScreen extends StatefulWidget {
   final String selectedDay;
   final WorkoutDay? existingWorkout;
@@ -207,13 +225,13 @@ class FilterScreen extends StatefulWidget {
 class _FilterScreenState extends State<FilterScreen> {
   late List<String> selectedCategories;
   final List<Map<String, dynamic>> categories = [
-    {"name": "Back", "icon": Icons.airline_seat_recline_normal, "color": Colors.orange},
-    {"name": "Bicep", "icon": Icons.handshake, "color": Colors.blue},
-    {"name": "Tricep", "icon": Icons.fitness_center, "color": Colors.deepPurple},
-    {"name": "Chest", "icon": Icons.fitness_center, "color": Colors.red},
-    {"name": "Shoulder", "icon": Icons.accessibility, "color": Colors.green},
-    {"name": "Abs", "icon": Icons.radio_button_unchecked, "color": Colors.amber},
-    {"name": "Leg", "icon": Icons.accessibility_new, "color": Colors.pink},
+    {"name": "Back", "icon": Icons.fitness_center, "color": const Color(0xFF6C5CE7)},
+    {"name": "Bicep", "icon": Icons.handshake, "color": const Color(0xFF4A90E2)},
+    {"name": "Tricep", "icon": Icons.fitness_center, "color": const Color(0xFF9B59B6)},
+    {"name": "Chest", "icon": Icons.fitness_center, "color": const Color(0xFFFF453A)},
+    {"name": "Shoulder", "icon": Icons.accessibility, "color": const Color(0xFF34C759)},
+    {"name": "Abs", "icon": Icons.radio_button_unchecked, "color": const Color(0xFFFFD60A)},
+    {"name": "Leg", "icon": Icons.accessibility_new, "color": const Color(0xFFFF9500)},
   ];
 
   @override
@@ -235,65 +253,93 @@ class _FilterScreenState extends State<FilterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F0F0F),
+      backgroundColor: const Color(0xFF0A0C10),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
+          icon: const Icon(Icons.arrow_back_ios, size: 20),
+          onPressed: () => Navigator.pop(context),
         ),
-        title: Text("Select Body Parts (${widget.selectedDay})"),
+        title: const Text("Select Body Parts", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
       ),
       body: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text("Choose muscle groups", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A1C24),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(widget.selectedDay, style: const TextStyle(fontSize: 12, color: Color(0xFFD4FF33))),
+            ),
             const SizedBox(height: 20),
-            Wrap(
-              spacing: 16,
-              runSpacing: 16,
-              children: categories.map((cat) {
-                final selected = selectedCategories.contains(cat['name']);
-                return GestureDetector(
-                  onTap: () => toggleCategory(cat['name']),
-                  child: Container(
-                    width: (MediaQuery.of(context).size.width - 72) / 2,
-                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: selected ? cat['color'] : const Color(0xFF1F222A),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.white24),
+            const Text("Choose muscle groups", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.white)),
+            const SizedBox(height: 16),
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final crossAxisCount = constraints.maxWidth > 500 ? 2 : 1;
+                  return GridView.builder(
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: crossAxisCount,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: 3.5,
                     ),
-                    child: Row(
-                      children: [
-                        Icon(cat['icon'], color: selected ? Colors.black : cat['color']),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            cat['name'],
-                            style: TextStyle(
-                              color: selected ? Colors.black : Colors.white,
-                              fontWeight: FontWeight.w600,
-                            ),
+                    itemCount: categories.length,
+                    itemBuilder: (context, index) {
+                      final cat = categories[index];
+                      final selected = selectedCategories.contains(cat['name']);
+                      return GestureDetector(
+                        onTap: () => toggleCategory(cat['name']),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: selected ? cat['color'] : const Color(0xFF1A1C24),
+                            borderRadius: BorderRadius.circular(14),
+                            border: selected ? null : Border.all(color: const Color(0xFF2A2D35)),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(cat['icon'], size: 20, color: selected ? Colors.white : cat['color']),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  cat['name'],
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    color: selected ? Colors.white : const Color(0xFFE0E0E0),
+                                  ),
+                                ),
+                              ),
+                              if (selected)
+                                const Icon(Icons.check_circle, color: Colors.white, size: 18),
+                            ],
                           ),
                         ),
-                        if (selected)
-                          const Icon(Icons.check_circle, color: Colors.black, size: 20),
-                      ],
-                    ),
-                  ),
-                );
-              }).toList(),
+                      );
+                    },
+                  );
+                },
+              ),
             ),
-            const Spacer(),
+            const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
-              height: 55,
+              height: 50,
               child: ElevatedButton(
                 onPressed: () async {
+                  if (selectedCategories.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Select at least one body part")),
+                    );
+                    return;
+                  }
                   final result = await Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -304,14 +350,16 @@ class _FilterScreenState extends State<FilterScreen> {
                       ),
                     ),
                   );
-                  if (result == true) Navigator.pop(context, true);
+                  if (result == true && mounted) {
+                    Navigator.pop(context, true);
+                  }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFD4FF33),
                   foregroundColor: Colors.black,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text("Continue"),
+                child: const Text("Continue", style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
               ),
             ),
           ],
@@ -321,7 +369,6 @@ class _FilterScreenState extends State<FilterScreen> {
   }
 }
 
-// =============================== 3. SELECT EXERCISE SCREEN ===============================
 class SelectExerciseScreen extends StatefulWidget {
   final List<String> selectedCategories;
   final String day;
@@ -372,46 +419,48 @@ class _SelectExerciseScreenState extends State<SelectExerciseScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F0F0F),
+      backgroundColor: const Color(0xFF0A0C10),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
+          icon: const Icon(Icons.arrow_back_ios, size: 20),
+          onPressed: () => Navigator.pop(context),
         ),
-        title: Text("Exercises (${widget.day})"),
+        title: const Text("Select Exercises", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
       ),
       body: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            TextField(
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                hintText: "Search workout",
-                hintStyle: const TextStyle(color: Colors.white38),
-                filled: true,
-                fillColor: const Color(0xFF1F222A),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20),
-                  borderSide: BorderSide.none,
-                ),
-                prefixIcon: const Icon(Icons.search, color: Colors.white54),
-                suffixIcon: searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear, color: Colors.white54),
-                        onPressed: () => setState(() => searchQuery = ""),
-                      )
-                    : null,
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A1C24),
+                borderRadius: BorderRadius.circular(12),
               ),
-              onChanged: (value) => setState(() => searchQuery = value),
+              child: TextField(
+                style: const TextStyle(color: Colors.white, fontSize: 14),
+                decoration: InputDecoration(
+                  hintText: "Search exercises",
+                  hintStyle: const TextStyle(color: Color(0xFF6B6F7A), fontSize: 14),
+                  border: InputBorder.none,
+                  prefixIcon: const Icon(Icons.search, color: Color(0xFF6B6F7A), size: 20),
+                  suffixIcon: searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.close, color: Color(0xFF6B6F7A), size: 18),
+                          onPressed: () => setState(() => searchQuery = ""),
+                        )
+                      : null,
+                ),
+                onChanged: (value) => setState(() => searchQuery = value),
+              ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
             if (widget.selectedCategories.isEmpty)
-              const Center(child: Text("Select body parts first", style: TextStyle(color: Colors.white54)))
+              const Expanded(child: Center(child: Text("Select body parts first", style: TextStyle(color: Color(0xFF8E8E93)))))
             else if (availableExercises.isEmpty)
-              const Center(child: Text("No exercises for selected categories", style: TextStyle(color: Colors.white54)))
+              const Expanded(child: Center(child: Text("No exercises for selected categories", style: TextStyle(color: Color(0xFF8E8E93)))))
             else
               Expanded(
                 child: ListView.builder(
@@ -422,26 +471,36 @@ class _SelectExerciseScreenState extends State<SelectExerciseScreen> {
                     return GestureDetector(
                       onTap: () => toggleExercise(ex),
                       child: Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.all(16),
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: selected ? const Color(0xFFD4FF33).withOpacity(0.15) : const Color(0xFF1F222A),
-                          borderRadius: BorderRadius.circular(16),
-                          border: selected ? Border.all(color: const Color(0xFFD4FF33)) : null,
+                          color: selected ? const Color(0xFFD4FF33).withOpacity(0.1) : const Color(0xFF1A1C24),
+                          borderRadius: BorderRadius.circular(12),
+                          border: selected ? Border.all(color: const Color(0xFFD4FF33), width: 1) : null,
                         ),
                         child: Row(
                           children: [
-                            Icon(
-                              selected ? Icons.check_circle : Icons.fitness_center,
-                              color: selected ? const Color(0xFFD4FF33) : Colors.white54,
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: selected ? const Color(0xFFD4FF33).withOpacity(0.2) : const Color(0xFF2A2D35),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(
+                                selected ? Icons.check : Icons.fitness_center,
+                                color: selected ? const Color(0xFFD4FF33) : const Color(0xFF6B6F7A),
+                                size: 20,
+                              ),
                             ),
-                            const SizedBox(width: 16),
+                            const SizedBox(width: 12),
                             Expanded(
                               child: Text(
                                 ex,
                                 style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
                                   color: selected ? const Color(0xFFD4FF33) : Colors.white,
-                                  fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
                                 ),
                               ),
                             ),
@@ -452,12 +511,18 @@ class _SelectExerciseScreenState extends State<SelectExerciseScreen> {
                   },
                 ),
               ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
-              height: 55,
+              height: 50,
               child: ElevatedButton(
                 onPressed: () {
+                  if (selectedExerciseNames.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Select at least one exercise")),
+                    );
+                    return;
+                  }
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -472,9 +537,9 @@ class _SelectExerciseScreenState extends State<SelectExerciseScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFD4FF33),
                   foregroundColor: Colors.black,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text("Next"),
+                child: const Text("Next", style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
               ),
             ),
           ],
@@ -484,7 +549,6 @@ class _SelectExerciseScreenState extends State<SelectExerciseScreen> {
   }
 }
 
-// =============================== 4. SET & REPS SCREEN ===============================
 class SetRepsScreen extends StatefulWidget {
   final List<String> exerciseNames;
   final String day;
@@ -504,61 +568,75 @@ class _SetRepsScreenState extends State<SetRepsScreen> {
     exerciseDetails = widget.exerciseNames.map((name) => ExerciseDetail(name: name, sets: 3, reps: 10)).toList();
   }
 
+  void updateSets(int index, int delta) {
+    setState(() {
+      int newValue = exerciseDetails[index].sets + delta;
+      if (newValue >= 1) exerciseDetails[index].sets = newValue;
+    });
+  }
+
+  void updateReps(int index, int delta) {
+    setState(() {
+      int newValue = exerciseDetails[index].reps + delta;
+      if (newValue >= 1) exerciseDetails[index].reps = newValue;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F0F0F),
+      backgroundColor: const Color(0xFF0A0C10),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back_ios, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text("Set & Reps"),
+        title: const Text("Set & Reps", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
       ),
       body: ListView.builder(
+        padding: const EdgeInsets.all(16),
         itemCount: exerciseDetails.length,
         itemBuilder: (_, i) {
           final ex = exerciseDetails[i];
-          return Card(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            color: const Color(0xFF1F222A),
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A1C24),
+              borderRadius: BorderRadius.circular(16),
+            ),
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(ex.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 10),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      Row(
-                        children: [
-                          IconButton(
-                            onPressed: () => setState(() { if (ex.sets > 1) ex.sets--; }),
-                            icon: const Icon(Icons.remove),
-                          ),
-                          Text("${ex.sets} sets", style: const TextStyle(fontSize: 16)),
-                          IconButton(
-                            onPressed: () => setState(() { ex.sets++; }),
-                            icon: const Icon(Icons.add),
-                          ),
-                        ],
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFD4FF33).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.fitness_center, color: Color(0xFFD4FF33), size: 22),
                       ),
-                      Row(
-                        children: [
-                          IconButton(
-                            onPressed: () => setState(() { if (ex.reps > 1) ex.reps--; }),
-                            icon: const Icon(Icons.remove),
-                          ),
-                          Text("${ex.reps} reps", style: const TextStyle(fontSize: 16)),
-                          IconButton(
-                            onPressed: () => setState(() { ex.reps++; }),
-                            icon: const Icon(Icons.add),
-                          ),
-                        ],
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          ex.name,
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.white),
+                        ),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _buildCounter("Sets", ex.sets, () => updateSets(i, -1), () => updateSets(i, 1)),
+                      _buildCounter("Reps", ex.reps, () => updateReps(i, -1), () => updateReps(i, 1)),
                     ],
                   ),
                 ],
@@ -567,35 +645,91 @@ class _SetRepsScreenState extends State<SetRepsScreen> {
           );
         },
       ),
-      bottomNavigationBar: Padding(
-        padding: const EdgeInsets.all(20),
-        child: ElevatedButton(
-          onPressed: () async {
-            final result = await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => WorkoutSectionScreen(
-                  exercisesDetail: exerciseDetails,
-                  day: widget.day,
-                  bodyParts: widget.bodyParts,
+      bottomNavigationBar: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0A0C10),
+          border: Border(top: BorderSide(color: const Color(0xFF1A1C24), width: 1)),
+        ),
+        child: SizedBox(
+          width: double.infinity,
+          height: 50,
+          child: ElevatedButton(
+            onPressed: () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => WorkoutSectionScreen(
+                    exercisesDetail: exerciseDetails,
+                    day: widget.day,
+                    bodyParts: widget.bodyParts,
+                  ),
+                ),
+              );
+              if (result == true && mounted) {
+                Navigator.pop(context, true);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFD4FF33),
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text("Next", style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCounter(String label, int value, VoidCallback onMinus, VoidCallback onPlus) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF2A2D35),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          Text(label, style: const TextStyle(fontSize: 12, color: Color(0xFF8E8E93))),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              GestureDetector(
+                onTap: onMinus,
+                child: Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1A1C24),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.remove, size: 16, color: Color(0xFFD4FF33)),
                 ),
               ),
-            );
-            if (result == true) Navigator.pop(context, true);
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFFD4FF33),
-            foregroundColor: Colors.black,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+              const SizedBox(width: 12),
+              Text(value.toString(), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
+              const SizedBox(width: 12),
+              GestureDetector(
+                onTap: onPlus,
+                child: Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1A1C24),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.add, size: 16, color: Color(0xFFD4FF33)),
+                ),
+              ),
+            ],
           ),
-          child: const Text("Next"),
-        ),
+        ],
       ),
     );
   }
 }
 
-// =============================== 5. WORKOUT SECTION SCREEN (SAVE) ===============================
 class WorkoutSectionScreen extends StatefulWidget {
   final List<ExerciseDetail> exercisesDetail;
   final String day;
@@ -615,81 +749,127 @@ class _WorkoutSectionScreenState extends State<WorkoutSectionScreen> {
   final TextEditingController _sectionController = TextEditingController();
 
   @override
+  void dispose() {
+    _sectionController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F0F0F),
+      backgroundColor: const Color(0xFF0A0C10),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back_ios, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text("Workout Section"),
+        title: const Text("Workout Summary", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
       ),
       body: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
-                color: const Color(0xFF1F222A),
-                borderRadius: BorderRadius.circular(20),
+                color: const Color(0xFF1A1C24),
+                borderRadius: BorderRadius.circular(12),
               ),
-              child: Text("Day: ${widget.day}"),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.calendar_today, size: 16, color: Color(0xFFD4FF33)),
+                  const SizedBox(width: 8),
+                  Text(widget.day, style: const TextStyle(fontSize: 13, color: Colors.white)),
+                ],
+              ),
             ),
             const SizedBox(height: 20),
-            const Text("Section Name", style: TextStyle(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
+            const Text("Section Name", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF8E8E93))),
+            const SizedBox(height: 6),
             TextField(
               controller: _sectionController,
+              style: const TextStyle(color: Colors.white, fontSize: 14),
               decoration: InputDecoration(
-                hintText: "e.g., Upper Body",
+                hintText: "e.g., Upper Body, Full Body, Cardio",
+                hintStyle: const TextStyle(color: Color(0xFF6B6F7A), fontSize: 14),
                 filled: true,
-                fillColor: const Color(0xFF1F222A),
+                fillColor: const Color(0xFF1A1C24),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
                 ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
               ),
             ),
             const SizedBox(height: 20),
-            const Text("Exercises", style: TextStyle(fontWeight: FontWeight.w600)),
+            const Text("Exercises", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF8E8E93))),
             const SizedBox(height: 8),
             Expanded(
-              child: widget.exercisesDetail.isEmpty
-                  ? const Center(child: Text("No exercises selected", style: TextStyle(color: Colors.white54)))
-                  : ListView.separated(
-                      itemCount: widget.exercisesDetail.length,
-                      separatorBuilder: (_, __) => const Divider(),
-                      itemBuilder: (_, i) => ListTile(
-                        leading: const Icon(Icons.fitness_center, color: Color(0xFFD4FF33)),
-                        title: Text(widget.exercisesDetail[i].name),
-                        subtitle: Text("${widget.exercisesDetail[i].sets} sets x ${widget.exercisesDetail[i].reps} reps"),
-                        trailing: const Icon(Icons.drag_handle, color: Colors.white54),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1C24),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: widget.exercisesDetail.isEmpty
+                    ? const Center(child: Text("No exercises selected", style: TextStyle(color: Color(0xFF8E8E93), fontSize: 13)))
+                    : ListView.separated(
+                        padding: const EdgeInsets.all(14),
+                        itemCount: widget.exercisesDetail.length,
+                        separatorBuilder: (_, __) => const Divider(color: Color(0xFF2A2D35), height: 1),
+                        itemBuilder: (_, i) {
+                          final ex = widget.exercisesDetail[i];
+                          return Row(
+                            children: [
+                              Container(
+                                width: 32,
+                                height: 32,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFD4FF33).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(Icons.fitness_center, color: Color(0xFFD4FF33), size: 16),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(ex.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.white)),
+                                    const SizedBox(height: 2),
+                                    Text("${ex.sets} sets x ${ex.reps} reps", style: const TextStyle(fontSize: 11, color: Color(0xFF8E8E93))),
+                                  ],
+                                ),
+                              ),
+                              const Icon(Icons.drag_handle, size: 16, color: Color(0xFF6B6F7A)),
+                            ],
+                          );
+                        },
                       ),
-                    ),
+              ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () => Navigator.pop(context),
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Colors.white24),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                      side: const BorderSide(color: Color(0xFF2A2D35)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: const Text("Cancel"),
+                    child: const Text("Cancel", style: TextStyle(fontSize: 14)),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () async {
-                      if (_sectionController.text.isEmpty) {
+                      if (_sectionController.text.trim().isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text("Please enter section name")),
                         );
@@ -699,12 +879,12 @@ class _WorkoutSectionScreenState extends State<WorkoutSectionScreen> {
                         dayName: widget.day,
                         bodyParts: widget.bodyParts,
                         exercises: widget.exercisesDetail,
-                        sectionName: _sectionController.text,
+                        sectionName: _sectionController.text.trim(),
                       );
                       await WorkoutStorage.saveWorkout(workout);
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text("Workout saved!")),
+                          const SnackBar(content: Text("Workout saved successfully!")),
                         );
                         Navigator.pop(context, true);
                       }
@@ -712,9 +892,10 @@ class _WorkoutSectionScreenState extends State<WorkoutSectionScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFD4FF33),
                       foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: const Text("Save"),
+                    child: const Text("Save", style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                   ),
                 ),
               ],

@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'checkout_screen.dart';
@@ -24,8 +23,7 @@ class _PersonalTrainerScreenState extends State<PersonalTrainerScreen> {
     {
       "level": "Bronze",
       "price": 500000,
-      "color": Colors.brown,
-      "bgColor": Colors.brown.shade900,
+      "color": const Color(0xFFCD7F32),
       "features": [
         "Workout plan basic",
         "Weekly check-in",
@@ -37,8 +35,7 @@ class _PersonalTrainerScreenState extends State<PersonalTrainerScreen> {
     {
       "level": "Silver",
       "price": 1000000,
-      "color": Colors.grey,
-      "bgColor": Colors.grey.shade800,
+      "color": const Color(0xFFC0C0C0),
       "features": [
         "Workout plan intermediate",
         "Daily check-in",
@@ -51,8 +48,7 @@ class _PersonalTrainerScreenState extends State<PersonalTrainerScreen> {
     {
       "level": "Gold",
       "price": 2000000,
-      "color": Colors.amber,
-      "bgColor": Colors.amber.shade900,
+      "color": const Color(0xFFD4AF37),
       "features": [
         "Workout plan advanced",
         "Unlimited chat support",
@@ -66,7 +62,7 @@ class _PersonalTrainerScreenState extends State<PersonalTrainerScreen> {
   ];
 
   String formatPrice(int price) {
-    return currencyFormat.format(price).replaceAll('Rp', 'Rp ');
+    return currencyFormat.format(price);
   }
 
   void _goToPage(int page) {
@@ -80,186 +76,276 @@ class _PersonalTrainerScreenState extends State<PersonalTrainerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F0F0F),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: Container(
-            height: MediaQuery.of(context).size.height - MediaQuery.of(context).padding.top,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+      backgroundColor: const Color(0xFF0A0C10),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: const Text(
+          "Personal Trainer",
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: Colors.white),
+        ),
+        centerTitle: true,
+      ),
+      body: Column(
+        children: [
+          const SizedBox(height: 20),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Text(
+              "Choose Your Coach Package",
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40),
+            child: Text(
+              "Select the perfect plan to achieve your fitness goals",
+              style: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFF8E8E93),
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const SizedBox(height: 32),
+          Expanded(
+            child: Stack(
               children: [
-                const Text(
-                  "Choose Your Coach Package",
-                  style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white, shadows: [
-                    Shadow(blurRadius: 10, color: Colors.black54, offset: Offset(2, 2))
-                  ]),
-                  textAlign: TextAlign.center,
+                PageView.builder(
+                  controller: _pageController,
+                  onPageChanged: (index) => setState(() => _currentPage = index),
+                  itemCount: subscriptions.length,
+                  itemBuilder: (context, index) {
+                    final sub = subscriptions[index];
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: _buildPackageCard(sub),
+                    );
+                  },
                 ),
-                const SizedBox(height: 30),
-                SizedBox(
-                  height: MediaQuery.of(context).size.height * 0.65,
-                  child: Stack(
-                    children: [
-                      PageView.builder(
-                        controller: _pageController,
-                        onPageChanged: (index) => setState(() => _currentPage = index),
-                        itemCount: subscriptions.length,
-                        itemBuilder: (context, index) {
-                          final sub = subscriptions[index];
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            child: Container(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: [sub['bgColor'], Colors.black],
-                                ),
-                                borderRadius: BorderRadius.circular(40),
-                                border: Border.all(color: sub['color'], width: 3),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: sub['color'].withOpacity(0.6),
-                                    blurRadius: 20,
-                                    spreadRadius: 2,
-                                    offset: const Offset(0, 10),
-                                  ),
-                                ],
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(40),
-                                child: BackdropFilter(
-                                  filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
-                                  child: Container(
-                                    color: Colors.black.withOpacity(0.3),
-                                    child: Column(
-                                      children: [
-                                        if (sub['recommended'])
-                                          Container(
-                                            width: double.infinity,
-                                            padding: const EdgeInsets.symmetric(vertical: 8),
-                                            decoration: BoxDecoration(
-                                              color: sub['color'],
-                                              borderRadius: const BorderRadius.only(
-                                                topLeft: Radius.circular(40),
-                                                topRight: Radius.circular(40),
-                                              ),
-                                            ),
-                                            child: const Text(
-                                              "⭐ RECOMMENDED ⭐",
-                                              textAlign: TextAlign.center,
-                                              style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-                                            ),
-                                          ),
-                                        Expanded(
-                                          child: Padding(
-                                            padding: const EdgeInsets.all(20),
-                                            child: Column(
-                                              mainAxisAlignment: MainAxisAlignment.center,
-                                              children: [
-                                                Text(sub['level'], style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: sub['color'], shadows: [
-                                                  Shadow(blurRadius: 8, color: sub['color'].withOpacity(0.5))
-                                                ])),
-                                                const SizedBox(height: 8),
-                                                Text(formatPrice(sub['price']), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
-                                                const SizedBox(height: 20),
-                                                Expanded(
-                                                  child: ListView(
-                                                    physics: const NeverScrollableScrollPhysics(),
-                                                    children: sub['features'].map<Widget>((f) => Padding(
-                                                      padding: const EdgeInsets.symmetric(vertical: 6),
-                                                      child: Row(
-                                                        children: [
-                                                          Icon(Icons.check_circle, color: sub['color'], size: 22),
-                                                          const SizedBox(width: 10),
-                                                          Expanded(child: Text(f, style: const TextStyle(fontSize: 13))),
-                                                        ],
-                                                      ),
-                                                    )).toList(),
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 20),
-                                                ElevatedButton(
-                                                  onPressed: () {
-                                                    Navigator.push(
-                                                      context,
-                                                      MaterialPageRoute(
-                                                        builder: (_) => CheckoutScreen(package: sub),
-                                                      ),
-                                                    );
-                                                  },
-                                                  style: ElevatedButton.styleFrom(
-                                                    backgroundColor: sub['color'],
-                                                    foregroundColor: Colors.black,
-                                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(40)),
-                                                    padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
-                                                  ),
-                                                  child: Text("Subscribe ${sub['level']}", style: const TextStyle(fontWeight: FontWeight.bold)),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                      // Left arrow
-                      if (_currentPage > 0)
-                        Positioned(
-                          left: 0,
-                          top: 0,
-                          bottom: 0,
-                          child: Center(
-                            child: IconButton(
-                              icon: const Icon(Icons.arrow_back_ios, color: Colors.white70, size: 30),
-                              onPressed: () => _goToPage(_currentPage - 1),
-                            ),
+                if (_currentPage > 0)
+                  Positioned(
+                    left: 8,
+                    top: 0,
+                    bottom: 0,
+                    child: Center(
+                      child: GestureDetector(
+                        onTap: () => _goToPage(_currentPage - 1),
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1A1C24),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: const Color(0xFF2A2D35)),
                           ),
+                          child: const Icon(Icons.chevron_left, color: Colors.white, size: 24),
                         ),
-                      // Right arrow
-                      if (_currentPage < subscriptions.length - 1)
-                        Positioned(
-                          right: 0,
-                          top: 0,
-                          bottom: 0,
-                          child: Center(
-                            child: IconButton(
-                              icon: const Icon(Icons.arrow_forward_ios, color: Colors.white70, size: 30),
-                              onPressed: () => _goToPage(_currentPage + 1),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(
-                    subscriptions.length,
-                    (i) => Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 5),
-                      width: 10,
-                      height: 10,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: _currentPage == i ? const Color(0xFFD4FF33) : Colors.white38,
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 30),
+                if (_currentPage < subscriptions.length - 1)
+                  Positioned(
+                    right: 8,
+                    top: 0,
+                    bottom: 0,
+                    child: Center(
+                      child: GestureDetector(
+                        onTap: () => _goToPage(_currentPage + 1),
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1A1C24),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: const Color(0xFF2A2D35)),
+                          ),
+                          child: const Icon(Icons.chevron_right, color: Colors.white, size: 24),
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(
+              subscriptions.length,
+              (i) => Container(
+                margin: const EdgeInsets.symmetric(horizontal: 6),
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _currentPage == i ? const Color(0xFFD4FF33) : const Color(0xFF3A3D45),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPackageCard(Map<String, dynamic> sub) {
+    final isRecommended = sub['recommended'] == true;
+    final Color cardColor = sub['color'];
+    
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [const Color(0xFF1A1C24), const Color(0xFF12151C)],
         ),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(
+          color: isRecommended ? cardColor : const Color(0xFF2A2D35),
+          width: isRecommended ? 2 : 1,
+        ),
+      ),
+      child: Column(
+        children: [
+          if (isRecommended)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              decoration: BoxDecoration(
+                color: cardColor,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(28),
+                  topRight: Radius.circular(28),
+                ),
+              ),
+              child: Text(
+                "RECOMMENDED",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: cardColor == const Color(0xFFC0C0C0) ? Colors.black : Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                  letterSpacing: 1,
+                ),
+              ),
+            ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: cardColor.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Icon(
+                          sub['level'] == "Bronze" ? Icons.emoji_events_outlined :
+                          sub['level'] == "Silver" ? Icons.workspace_premium :
+                          Icons.stars,
+                          color: cardColor,
+                          size: 28,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            sub['level'],
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: cardColor,
+                            ),
+                          ),
+                          Text(
+                            formatPrice(sub['price']),
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  const Divider(color: Color(0xFF2A2D35), height: 1),
+                  const SizedBox(height: 16),
+                  Text(
+                    "What's included:",
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey[400],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: ListView(
+                      physics: const NeverScrollableScrollPhysics(),
+                      children: (sub['features'] as List<String>).map((feature) => Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Row(
+                          children: [
+                            Icon(Icons.check_circle, color: cardColor, size: 18),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                feature,
+                                style: const TextStyle(fontSize: 13, color: Color(0xFFE0E0E0)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )).toList(),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => CheckoutScreen(package: sub),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: cardColor,
+                        foregroundColor: cardColor == const Color(0xFFC0C0C0) ? Colors.black : Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: Text(
+                        "Subscribe Now",
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

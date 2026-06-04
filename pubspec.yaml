@@ -27,6 +27,24 @@ flutter:
   assets:
     - assets/splash.png
     - assets/icon/logo.png
+    - assets/arm1.png
+    - assets/chest1.png
+    - assets/back1.png
+    - assets/leg1.png
+    - assets/arm2.png
+    - assets/chest2.png
+    - assets/back2.png
+    - assets/leg2.png
+    - assets/arm3.png
+    - assets/chest3.png
+    - assets/back.webp
+    - assets/leg3.png
+    - assets/pushday.jpg
+    - assets/pullday.jpeg
+    - assets/legday.webp
+    - assets/fullbody.png
+    - assets/hiit.png
+    - assets/time.jpg
 
 flutter_native_splash:
   color: "#b9f14e"
