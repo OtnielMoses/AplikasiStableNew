@@ -4,6 +4,7 @@ import 'Login/signin_screen.dart';
 import 'Login/signup_screen.dart';
 import 'Home/main_screen.dart';
 import 'Login/verif_email.dart';
+import 'Onboarding/gender.dart';
 
 void main() {
   runApp(const MyApp());
@@ -27,6 +28,7 @@ class MyApp extends StatelessWidget {
         '/signup': (context) => const SignUpScreen(),
         '/home': (context) => const MainScreen(),
         '/verify-email': (context) => const VerifyEmailScreen(),
+        '/gender': (context) => const GenderSelectionPage(),
       },
     );
   }
