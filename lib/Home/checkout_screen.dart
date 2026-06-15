@@ -1,33 +1,27 @@
+// lib/screens/checkout_screen.dart
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import '../core/constants/app_colors.dart';
+import '../core/constants/app_text_styles.dart';
+import '../core/utils/formatter.dart';
+import 'package:stable_app/core/widgets/common/custom_button.dart';
 
 class CheckoutScreen extends StatelessWidget {
   final Map<String, dynamic> package;
   const CheckoutScreen({super.key, required this.package});
-
-  String formatPrice(int price) {
-    final format = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp', decimalDigits: 0);
-    return format.format(price);
-  }
 
   @override
   Widget build(BuildContext context) {
     final Color packageColor = package['color'];
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0C10),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
+        title: const Text("Checkout"),
+        centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, size: 20, color: Colors.white),
+          icon: const Icon(Icons.arrow_back_ios, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          "Checkout",
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.white),
-        ),
-        centerTitle: true,
       ),
       body: Padding(
         padding: const EdgeInsets.all(20),
@@ -40,7 +34,11 @@ class CheckoutScreen extends StatelessWidget {
             const SizedBox(height: 24),
             _buildPaymentMethodSection(),
             const Spacer(),
-            _buildPayButton(context, packageColor),
+            CustomButton(
+              text: "Pay Now",
+              onPressed: () => _showPaymentDialog(context, packageColor),
+              width: double.infinity,
+            ),
             const SizedBox(height: 16),
           ],
         ),
@@ -52,7 +50,7 @@ class CheckoutScreen extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF1A1C24), Color(0xFF12151C)],
+          colors: [AppColors.surface, AppColors.surfaceVariant],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -73,9 +71,11 @@ class CheckoutScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Icon(
-                    package['level'] == "Bronze" ? Icons.emoji_events_outlined :
-                    package['level'] == "Silver" ? Icons.workspace_premium :
-                    Icons.stars,
+                    package['level'] == "Bronze"
+                        ? Icons.emoji_events_outlined
+                        : package['level'] == "Silver"
+                        ? Icons.workspace_premium
+                        : Icons.stars,
                     color: packageColor,
                     size: 28,
                   ),
@@ -86,19 +86,15 @@ class CheckoutScreen extends StatelessWidget {
                   children: [
                     Text(
                       package['level'],
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: packageColor,
-                      ),
+                      style: AppTextStyles.headingH3.copyWith(color: packageColor),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      formatPrice(package['price']),
+                      Formatter.formatPrice(package['price']),
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: Colors.white,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                   ],
@@ -106,15 +102,11 @@ class CheckoutScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 20),
-            const Divider(color: Color(0xFF2A2D35), height: 1),
+            const Divider(color: AppColors.border, height: 1),
             const SizedBox(height: 16),
             Text(
               "Package Includes:",
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: Colors.grey[400],
-              ),
+              style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w500),
             ),
             const SizedBox(height: 12),
             ...(package['features'] as List<String>).map((feature) => Padding(
@@ -126,7 +118,7 @@ class CheckoutScreen extends StatelessWidget {
                   Expanded(
                     child: Text(
                       feature,
-                      style: const TextStyle(fontSize: 13, color: Color(0xFFE0E0E0)),
+                      style: AppTextStyles.bodyMedium,
                     ),
                   ),
                 ],
@@ -142,7 +134,7 @@ class CheckoutScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1C24),
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
@@ -150,22 +142,22 @@ class CheckoutScreen extends StatelessWidget {
         children: [
           const Text(
             "Total Amount",
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.white),
+            style: AppTextStyles.bodyLarge,
           ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                formatPrice(package['price']),
+                Formatter.formatPrice(package['price']),
                 style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFFD4FF33),
+                  color: AppColors.primary,
                 ),
               ),
               Text(
                 "incl. tax",
-                style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                style: AppTextStyles.caption,
               ),
             ],
           ),
@@ -180,15 +172,15 @@ class CheckoutScreen extends StatelessWidget {
       children: [
         const Text(
           "Payment Method",
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white),
+          style: AppTextStyles.bodyLarge,
         ),
         const SizedBox(height: 12),
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFF1A1C24),
+            color: AppColors.surface,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFF2A2D35)),
+            border: Border.all(color: AppColors.border),
           ),
           child: Row(
             children: [
@@ -210,12 +202,12 @@ class CheckoutScreen extends StatelessWidget {
                   children: [
                     Text(
                       "QRIS",
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white),
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                     ),
                     SizedBox(height: 2),
                     Text(
                       "Scan QR code with any payment app",
-                      style: TextStyle(fontSize: 12, color: Color(0xFF8E8E93)),
+                      style: TextStyle(fontSize: 12, color: AppColors.textHint),
                     ),
                   ],
                 ),
@@ -223,9 +215,9 @@ class CheckoutScreen extends StatelessWidget {
               Container(
                 width: 24,
                 height: 24,
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   shape: BoxShape.circle,
-                  color: const Color(0xFFD4FF33),
+                  color: AppColors.primary,
                 ),
                 child: const Icon(Icons.check, size: 14, color: Colors.black),
               ),
@@ -236,46 +228,25 @@ class CheckoutScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildPayButton(BuildContext context, Color packageColor) {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed: () => _showPaymentDialog(context, packageColor),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFFD4FF33),
-          foregroundColor: Colors.black,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        ),
-        child: const Text(
-          "Pay Now",
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-        ),
-      ),
-    );
-  }
-
   void _showPaymentDialog(BuildContext context, Color packageColor) {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1C24),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: const Color(0xFFD4FF33).withOpacity(0.15),
+                color: AppColors.primary.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.qr_code_scanner, color: Color(0xFFD4FF33), size: 24),
+              child: const Icon(Icons.qr_code_scanner, color: AppColors.primary, size: 24),
             ),
             const SizedBox(width: 12),
             const Text(
               "Payment QRIS",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.white),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
             ),
           ],
         ),
@@ -297,17 +268,17 @@ class CheckoutScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFF2A2D35),
+                color: AppColors.border,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.info_outline, size: 16, color: Color(0xFFD4FF33)),
+                  const Icon(Icons.info_outline, size: 16, color: AppColors.primary),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       "Scan this QR code using your payment app to complete transaction",
-                      style: const TextStyle(fontSize: 12, color: Color(0xFFB0B3B8)),
+                      style: AppTextStyles.bodySmall,
                     ),
                   ),
                 ],
@@ -321,14 +292,11 @@ class CheckoutScreen extends StatelessWidget {
               Navigator.pop(context);
               _showSuccessDialog(context);
             },
-            style: TextButton.styleFrom(
-              foregroundColor: const Color(0xFFD4FF33),
-            ),
             child: const Text("I've Paid", style: TextStyle(fontWeight: FontWeight.w600)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel", style: TextStyle(color: Color(0xFF8E8E93))),
+            child: const Text("Cancel", style: TextStyle(color: AppColors.textHint)),
           ),
         ],
       ),
@@ -340,22 +308,20 @@ class CheckoutScreen extends StatelessWidget {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1C24),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: const Color(0xFFD4FF33).withOpacity(0.15),
+                color: AppColors.primary.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.check_circle, color: Color(0xFFD4FF33), size: 28),
+              child: const Icon(Icons.check_circle, color: AppColors.primary, size: 28),
             ),
             const SizedBox(width: 12),
             const Text(
               "Payment Successful!",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.white),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
             ),
           ],
         ),
@@ -365,29 +331,23 @@ class CheckoutScreen extends StatelessWidget {
           children: [
             Text(
               "Your ${package['level']} package has been activated.",
-              style: const TextStyle(color: Color(0xFFE0E0E0)),
+              style: AppTextStyles.bodyMedium,
             ),
             const SizedBox(height: 8),
             Text(
               "You can now access all premium features.",
-              style: TextStyle(color: Colors.grey[400], fontSize: 13),
+              style: AppTextStyles.bodySmall,
             ),
           ],
         ),
         actions: [
-          ElevatedButton(
+          CustomButton(
+            text: "Back to Home",
             onPressed: () {
-              Navigator.pop(context);
-              Navigator.pop(context);
-              Navigator.pop(context);
+              Navigator.pop(context); // tutup dialog sukses
+              Navigator.pop(context); // tutup dialog qr
+              Navigator.pop(context); // tutup halaman checkout
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFD4FF33),
-              foregroundColor: Colors.black,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: const Text("Back to Home", style: TextStyle(fontWeight: FontWeight.w600)),
           ),
         ],
       ),
