@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/workout_data.dart';
 
 class WorkoutSessionScreen extends StatefulWidget {
@@ -38,7 +39,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
             _remaining = _remaining - const Duration(seconds: 1);
           } else {
             _timer?.cancel();
-            _showCompletionDialog();
+            _finishWorkout();
           }
         });
       }
@@ -94,7 +95,78 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
 
   void _finishWorkout() {
     _timer?.cancel();
+    _updateStats();
     _showCompletionDialog();
+  }
+
+  Future<void> _updateStats() async {
+    final prefs = await SharedPreferences.getInstance();
+    final now = DateTime.now();
+    final todayStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
+    // Total workouts
+    int totalWorkouts = prefs.getInt('total_workouts') ?? 0;
+    totalWorkouts++;
+    await prefs.setInt('total_workouts', totalWorkouts);
+
+    // Days active
+    String? lastActiveDate = prefs.getString('last_active_date');
+    if (lastActiveDate != todayStr) {
+      int daysActive = prefs.getInt('days_active') ?? 0;
+      daysActive++;
+      await prefs.setInt('days_active', daysActive);
+      await prefs.setString('last_active_date', todayStr);
+    }
+
+    // Streak
+    String? lastWorkoutDate = prefs.getString('last_workout_date');
+    int currentStreak = prefs.getInt('streak') ?? 0;
+
+    // Cek apakah hari ini rest day
+    String? restDayDate = prefs.getString('rest_day_date');
+    bool isRestDayToday = restDayDate == todayStr;
+
+    if (lastWorkoutDate == null) {
+      // Pertama kali workout
+      currentStreak = 1;
+    } else {
+      final last = DateTime.parse(lastWorkoutDate);
+      final difference = now.difference(last).inDays;
+      if (difference == 0) {
+        // Sudah workout hari ini, streak tetap
+        // tidak perlu ubah
+      } else if (difference == 1) {
+        // Workout kemarin, lanjutkan streak
+        currentStreak++;
+      } else {
+        // Terlewat lebih dari 1 hari, cek apakah ada rest day di antara
+        // Untuk sederhana, reset streak
+        // Namun jika ada rest day yang bersambung, streak tetap
+        // Kita cek apakah kemarin adalah rest day
+        final yesterdayStr = '${now.subtract(const Duration(days: 1)).year}-${now.subtract(const Duration(days: 1)).month.toString().padLeft(2, '0')}-${now.subtract(const Duration(days: 1)).day.toString().padLeft(2, '0')}';
+        String? yesterdayRest = prefs.getString('rest_day_date');
+        if (yesterdayRest == yesterdayStr) {
+          // Kemarin rest day, streak tidak reset
+          // Streak tetap
+          // Tapi kita perlu cek apakah sebelumnya workout
+          // Untuk sederhana, kita pertahankan streak jika selisih <= 2 hari dan ada rest day
+          if (difference <= 2) {
+            // Streak tetap
+          } else {
+            currentStreak = 1;
+          }
+        } else {
+          // Reset streak
+          currentStreak = 1;
+        }
+      }
+    }
+
+    await prefs.setInt('streak', currentStreak);
+    await prefs.setString('last_workout_date', todayStr);
+    
+    // Hapus status rest day (karena sudah workout)
+    await prefs.remove('rest_day_date');
   }
 
   void _showCompletionDialog() {

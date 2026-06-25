@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 import '../models/workout_data.dart';
 
 class SelectDayScreen extends StatefulWidget {
@@ -20,11 +22,64 @@ class _SelectDayScreenState extends State<SelectDayScreen> {
   ];
 
   Map<String, WorkoutDay?> workoutMap = {};
+  bool _isRestDayToday = false;
 
   @override
   void initState() {
     super.initState();
     _loadWorkouts();
+    _checkRestDay();
+  }
+
+  String _todayString() {
+    final now = DateTime.now();
+    return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _checkRestDay() async {
+    final prefs = await SharedPreferences.getInstance();
+    final todayStr = _todayString();
+    final isRest = prefs.getString('rest_day_date') == todayStr;
+    setState(() {
+      _isRestDayToday = isRest;
+    });
+  }
+
+  Future<void> _setRestDay() async {
+    final prefs = await SharedPreferences.getInstance();
+    final todayStr = _todayString();
+
+    if (prefs.getString('rest_day_date') == todayStr) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Today is already a rest day.")),
+      );
+      return;
+    }
+
+    // Cek apakah sudah workout hari ini
+    final lastWorkoutDate = prefs.getString('last_workout_date');
+    if (lastWorkoutDate == todayStr) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("You already worked out today. Rest day cannot be set.")),
+      );
+      return;
+    }
+
+    // Set rest day
+    await prefs.setString('rest_day_date', todayStr);
+
+    // Update streak: rest day mempertahankan streak (tidak menambah, tidak mengurangi)
+    // Jika belum ada streak, inisialisasi dengan 0
+    final currentStreak = prefs.getInt('streak') ?? 0;
+    // Streak tetap, tidak berubah
+
+    setState(() {
+      _isRestDayToday = true;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Rest day set for today. Streak maintained.")),
+    );
   }
 
   Future<void> _loadWorkouts() async {
@@ -45,7 +100,10 @@ class _SelectDayScreenState extends State<SelectDayScreen> {
     }
   }
 
-  Future<void> _refreshData() async => _loadWorkouts();
+  Future<void> _refreshData() async {
+    await _loadWorkouts();
+    await _checkRestDay();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -62,6 +120,14 @@ class _SelectDayScreenState extends State<SelectDayScreen> {
             icon: const Icon(Icons.refresh, color: Color(0xFFD4FF33)),
             onPressed: _refreshData,
           ),
+          IconButton(
+            icon: Icon(
+              _isRestDayToday ? Icons.bedtime : Icons.bedtime_outlined,
+              color: _isRestDayToday ? Colors.orange : Colors.white,
+            ),
+            onPressed: _setRestDay,
+            tooltip: "Set Rest Day",
+          ),
         ],
       ),
       body: RefreshIndicator(
@@ -71,7 +137,22 @@ class _SelectDayScreenState extends State<SelectDayScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("Choose a day for your workout plan", style: TextStyle(fontSize: 14, color: Color(0xFF8E8E93))),
+              Row(
+                children: [
+                  const Text("Choose a day for your workout plan", style: TextStyle(fontSize: 14, color: Color(0xFF8E8E93))),
+                  const Spacer(),
+                  if (_isRestDayToday)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.orange),
+                      ),
+                      child: const Text("Rest Day", style: TextStyle(color: Colors.orange, fontSize: 12)),
+                    ),
+                ],
+              ),
               const SizedBox(height: 20),
               Expanded(
                 child: LayoutBuilder(
@@ -105,7 +186,7 @@ class _SelectDayScreenState extends State<SelectDayScreen> {
                               ),
                             );
                             if (result == true) {
-                              await _loadWorkouts();
+                              await _refreshData();
                             }
                           },
                         );
@@ -212,6 +293,8 @@ class _DayCard extends StatelessWidget {
     );
   }
 }
+
+// ===== FILTER SCREEN DAN SETERUSNYA (sama seperti sebelumnya, hanya untuk lengkap) =====
 
 class FilterScreen extends StatefulWidget {
   final String selectedDay;
@@ -547,6 +630,26 @@ class _SelectExerciseScreenState extends State<SelectExerciseScreen> {
       ),
     );
   }
+}
+
+// Daftar exercise berdasarkan kategori (sama seperti sebelumnya)
+List<String> getExercisesByCategories(List<String> categories) {
+  final Map<String, List<String>> exerciseMap = {
+    'Chest': ['Bench Press', 'Incline Press', 'Decline Press', 'Dumbbell Fly', 'Cable Crossover', 'Pec Deck', 'Chest Dip', 'Push Up'],
+    'Back': ['Pull Up', 'Bent Over Row', 'T-Bar Row', 'Lat Pulldown', 'Seated Row', 'Single Arm Row', 'Rack Pull', 'Reverse Fly', 'Back Extension', 'Deadlift'],
+    'Shoulder': ['Military Press', 'Arnold Press', 'Lateral Raise', 'Rear Delt Fly', 'Upright Row', 'Front Raise'],
+    'Bicep': ['Barbell Curl', 'Preacher Curl', 'Incline Curl', 'Cable Curl', 'Concentration Curl', 'Zottman Curl', 'Reverse Curl', 'Hammer Curl'],
+    'Tricep': ['Close Grip Bench Press', 'Skull Crusher', 'Tricep Pushdown', 'Overhead Extension', 'Tricep Dip', 'Tricep Kickback', 'Bench Dip'],
+    'Leg': ['Squat', 'Leg Press', 'Bulgarian Split Squat', 'Lunge', 'Deadlift', 'Leg Curl', 'Leg Extension', 'Hip Thrust', 'Box Jump', 'Calf Raise'],
+    'Abs': ['Plank', 'Crunches', 'Russian Twist', 'Leg Raise', 'V-Up', 'Flutter Kick', 'Mountain Climber'],
+  };
+  List<String> result = [];
+  for (var cat in categories) {
+    if (exerciseMap.containsKey(cat)) {
+      result.addAll(exerciseMap[cat]!);
+    }
+  }
+  return result.toSet().toList();
 }
 
 class SetRepsScreen extends StatefulWidget {

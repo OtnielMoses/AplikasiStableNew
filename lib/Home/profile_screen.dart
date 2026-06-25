@@ -31,6 +31,7 @@ class _PersonalDetailsScreenState extends State<PersonalDetailsScreen> {
   void initState() {
     super.initState();
     _loadUserData();
+    _loadStats();
   }
 
   Future<void> _loadUserData() async {
@@ -38,6 +39,15 @@ class _PersonalDetailsScreenState extends State<PersonalDetailsScreen> {
     setState(() {
       _name = prefs.getString('username') ?? "";
       _email = prefs.getString('email') ?? "";
+    });
+  }
+
+  Future<void> _loadStats() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _workoutsCount = prefs.getInt('total_workouts') ?? 0;
+      _daysActive = prefs.getInt('days_active') ?? 0;
+      _streak = prefs.getInt('streak') ?? 0;
     });
   }
 
