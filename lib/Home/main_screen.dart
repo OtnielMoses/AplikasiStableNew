@@ -34,11 +34,9 @@ class _MainScreenState extends State<MainScreen> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: currentIndex,
         onTap: (index) {
-          if (index < pages.length) {
-            setState(() {
-              currentIndex = index;
-            });
-          }
+          setState(() {
+            currentIndex = index;
+          });
         },
         type: BottomNavigationBarType.fixed,
         backgroundColor: Colors.black,

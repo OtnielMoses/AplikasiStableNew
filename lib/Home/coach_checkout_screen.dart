@@ -1,26 +1,33 @@
-// lib/screens/checkout_screen.dart
 import 'package:flutter/material.dart';
-import '../core/constants/app_colors.dart';
-import '../core/constants/app_text_styles.dart';
-import '../core/utils/formatter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:stable_app/core/constants/app_colors.dart';
+import 'package:stable_app/core/constants/app_text_styles.dart';
+import 'package:stable_app/core/utils/formatter.dart';
 import 'package:stable_app/core/widgets/common/custom_button.dart';
+import 'personal_trainer_screen.dart';
+import 'coach_chat_screen.dart';
 
-class CheckoutScreen extends StatelessWidget {
-  final Map<String, dynamic> package;
-  const CheckoutScreen({super.key, required this.package});
+class CoachCheckoutScreen extends StatefulWidget {
+  final Coach coach;
+  const CoachCheckoutScreen({super.key, required this.coach});
+
+  @override
+  State<CoachCheckoutScreen> createState() => _CoachCheckoutScreenState();
+}
+
+class _CoachCheckoutScreenState extends State<CoachCheckoutScreen> {
+  final int price = 20000; // fixed 20k
 
   @override
   Widget build(BuildContext context) {
-    final Color packageColor = package['color'];
-
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text("Checkout"),
+        title: const Text("Hire Coach"),
         centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, size: 20),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => Navigator.pop(context, false), // return false jika batal
         ),
       ),
       body: Padding(
@@ -28,7 +35,7 @@ class CheckoutScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildPackageCard(packageColor),
+            _buildCoachCard(),
             const SizedBox(height: 24),
             _buildPriceSection(),
             const SizedBox(height: 24),
@@ -36,7 +43,7 @@ class CheckoutScreen extends StatelessWidget {
             const Spacer(),
             CustomButton(
               text: "Pay Now",
-              onPressed: () => _showPaymentDialog(context, packageColor),
+              onPressed: () => _showPaymentDialog(context),
               width: double.infinity,
             ),
             const SizedBox(height: 16),
@@ -46,84 +53,50 @@ class CheckoutScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildPackageCard(Color packageColor) {
+  Widget _buildCoachCard() {
     return Container(
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppColors.surface, AppColors.surfaceVariant],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: const Color(0xFF1A1C24),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: packageColor.withOpacity(0.3), width: 1),
+        border: Border.all(color: const Color(0xFF2A2D35)),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        padding: const EdgeInsets.all(16),
+        child: Row(
           children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: packageColor.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(
-                    package['level'] == "Bronze"
-                        ? Icons.emoji_events_outlined
-                        : package['level'] == "Silver"
-                        ? Icons.workspace_premium
-                        : Icons.stars,
-                    color: packageColor,
-                    size: 28,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      package['level'],
-                      style: AppTextStyles.headingH3.copyWith(color: packageColor),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      Formatter.formatPrice(package['price']),
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.grey[800],
+              ),
+              child: const Icon(Icons.person, size: 32, color: Colors.white),
             ),
-            const SizedBox(height: 20),
-            const Divider(color: AppColors.border, height: 1),
-            const SizedBox(height: 16),
-            Text(
-              "Package Includes:",
-              style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w500),
-            ),
-            const SizedBox(height: 12),
-            ...(package['features'] as List<String>).map((feature) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Row(
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.check_circle, color: packageColor, size: 18),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      feature,
-                      style: AppTextStyles.bodyMedium,
+                  Text(
+                    widget.coach.name,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    widget.coach.specialty,
+                    style: const TextStyle(
+                      color: Color(0xFFD4FF33),
+                      fontSize: 14,
                     ),
                   ),
                 ],
               ),
-            )).toList(),
+            ),
           ],
         ),
       ),
@@ -141,14 +114,14 @@ class CheckoutScreen extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           const Text(
-            "Total Amount",
+            "Consultation Fee",
             style: AppTextStyles.bodyLarge,
           ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                Formatter.formatPrice(package['price']),
+                Formatter.formatPrice(price),
                 style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
@@ -156,7 +129,7 @@ class CheckoutScreen extends StatelessWidget {
                 ),
               ),
               Text(
-                "incl. tax",
+                "15 min session",
                 style: AppTextStyles.caption,
               ),
             ],
@@ -228,7 +201,7 @@ class CheckoutScreen extends StatelessWidget {
     );
   }
 
-  void _showPaymentDialog(BuildContext context, Color packageColor) {
+  void _showPaymentDialog(BuildContext context) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -304,6 +277,8 @@ class CheckoutScreen extends StatelessWidget {
   }
 
   void _showSuccessDialog(BuildContext context) {
+    _setSessionActive();
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -330,27 +305,43 @@ class CheckoutScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              "Your ${package['level']} package has been activated.",
+              "You've hired ${widget.coach.name}.",
               style: AppTextStyles.bodyMedium,
             ),
             const SizedBox(height: 8),
             Text(
-              "You can now access all premium features.",
+              "You will be connected to chat. Session lasts 15 minutes.",
               style: AppTextStyles.bodySmall,
             ),
           ],
         ),
         actions: [
           CustomButton(
-            text: "Back to Home",
+            text: "Start Chat",
             onPressed: () {
-              Navigator.pop(context); // tutup dialog sukses
-              Navigator.pop(context); // tutup dialog qr
-              Navigator.pop(context); // tutup halaman checkout
+              // Kembalikan true ke halaman sebelumnya (PersonalTrainerScreen) agar refresh
+              Navigator.pop(context, true); // tutup dialog sukses
+              // Navigasi ke chat screen
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => CoachChatScreen(
+                    coach: widget.coach,
+                    sessionDuration: const Duration(minutes: 15),
+                    isResuming: false,
+                  ),
+                ),
+              );
             },
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _setSessionActive() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isChatSessionActive', true);
+    await prefs.setString('currentCoachId', widget.coach.id);
   }
 }
