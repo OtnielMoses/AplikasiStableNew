@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'home_screen.dart';
-import 'profile_screen.dart';
+import 'personal_details_screen.dart';
 import 'workout_screen.dart';
 import 'personal_trainer_screen.dart';
 

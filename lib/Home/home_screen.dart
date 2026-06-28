@@ -10,6 +10,8 @@ import '../core/constants/app_text_styles.dart';
 import '../core/utils/formatter.dart';
 import 'package:stable_app/core/widgets/common/custom_button.dart';
 import 'package:stable_app/core/widgets/common/custom_card.dart';
+import '../models/scheduled_plan.dart';
+import '../services/workout_api_service.dart';
 
 // ==================== WORKOUT DATABASE ====================
 
@@ -390,6 +392,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  // ── existing state ──────────────────────────────────────────
   String selectedLevel = "Beginner";
   late DateTime currentDate;
   late List<DateTime> weekDays;
@@ -401,6 +404,56 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoadingWorkout = true;
   String _userName = "Guest";
   String _userInitial = "G";
+
+  // ── new state ───────────────────────────────────────────────
+  String selectedMuscle = 'Perut';
+  Map<String, ScheduledDayPlan> weeklySchedule = {};
+  List<String> completedIds = [];
+  bool isLoadingSchedule = true;
+  bool isLoadingExercises = true;
+  Map<String, dynamic>? dailyChallengeApi;
+  bool isLoadingChallengeApi = true;
+
+  static const List<String> muscleGroups = [
+    'Perut',
+    'Lengan',
+    'Dada',
+    'Kaki',
+    'Bahu & Punggung',
+  ];
+
+  static const Map<String, List<Map<String, dynamic>>> defaultExercisesByMuscle = {
+    'Perut': [
+      {'id': 'crunches', 'name': 'Crunches', 'sets': 3, 'reps': 20},
+      {'id': 'plank', 'name': 'Plank', 'sets': 3, 'reps': 45, 'unit': 'det'},
+      {'id': 'leg-raise', 'name': 'Leg Raise', 'sets': 3, 'reps': 15},
+      {'id': 'russian-twist', 'name': 'Russian Twist', 'sets': 3, 'reps': 20},
+    ],
+    'Lengan': [
+      {'id': 'bicep-curl', 'name': 'Bicep Curl', 'sets': 3, 'reps': 12},
+      {'id': 'tricep-dip', 'name': 'Tricep Dip', 'sets': 3, 'reps': 15},
+      {'id': 'hammer-curl', 'name': 'Hammer Curl', 'sets': 3, 'reps': 12},
+      {'id': 'push-up-arm', 'name': 'Push Up', 'sets': 3, 'reps': 15},
+    ],
+    'Dada': [
+      {'id': 'push-up', 'name': 'Push Up', 'sets': 4, 'reps': 15},
+      {'id': 'wide-push-up', 'name': 'Wide Push Up', 'sets': 3, 'reps': 12},
+      {'id': 'chest-squeeze', 'name': 'Chest Squeeze', 'sets': 3, 'reps': 15},
+      {'id': 'incline-push-up', 'name': 'Incline Push Up', 'sets': 3, 'reps': 12},
+    ],
+    'Kaki': [
+      {'id': 'squat', 'name': 'Squat', 'sets': 4, 'reps': 15},
+      {'id': 'lunges', 'name': 'Lunges', 'sets': 3, 'reps': 12},
+      {'id': 'calf-raise', 'name': 'Calf Raise', 'sets': 3, 'reps': 20},
+      {'id': 'wall-sit', 'name': 'Wall Sit', 'sets': 3, 'reps': 45, 'unit': 'det'},
+    ],
+    'Bahu & Punggung': [
+      {'id': 'shoulder-press', 'name': 'Shoulder Press', 'sets': 3, 'reps': 12},
+      {'id': 'lateral-raise', 'name': 'Lateral Raise', 'sets': 3, 'reps': 15},
+      {'id': 'front-raise', 'name': 'Front Raise', 'sets': 3, 'reps': 12},
+      {'id': 'superman-hold', 'name': 'Superman Hold', 'sets': 3, 'reps': 15},
+    ],
+  };
 
   final List<String> levels = ["Beginner", "Intermediate", "Advance"];
   late PageController _pageController;
@@ -434,13 +487,21 @@ class _HomeScreenState extends State<HomeScreen> {
     currentDate = DateTime.now();
     _generateWeekDays();
     _loadUserData();
+    _loadWeeklySchedule();
+    _loadDailyChallengeApi();
     _pageController = PageController(initialPage: levels.indexOf(selectedLevel));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadTodayWorkout();
       _centerCurrentDate();
     });
   }
-  
+
+  // ── rentang kalender diperluas ke 45 hari ───────────────────
+  void _generateWeekDays() {
+    DateTime start = currentDate.subtract(const Duration(days: 30));
+    weekDays = List.generate(45, (index) => start.add(Duration(days: index)));
+  }
+
   void _centerCurrentDate() {
     int todayIndex = weekDays.indexWhere((date) =>
         date.year == DateTime.now().year &&
@@ -462,6 +523,86 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // ── helper: konversi weekday Dart (1=Mon) ke JS style (0=Sun) ──
+  int _jsDayIndex(DateTime date) => date.weekday % 7;
+
+  Future<void> _loadWeeklySchedule() async {
+    if (!mounted) return;
+    setState(() => isLoadingSchedule = true);
+    final raw = await WorkoutApiService.getWeeklySchedule();
+    final parsed = <String, ScheduledDayPlan>{};
+    raw.forEach((key, value) {
+      if (value is Map<String, dynamic>) {
+        final dayIndex = value['day_index'] ?? value['dayIndex'] ?? key;
+        parsed[dayIndex.toString()] = ScheduledDayPlan.fromJson(value);
+      }
+    });
+    if (!mounted) return;
+    setState(() {
+      weeklySchedule = parsed;
+      isLoadingSchedule = false;
+    });
+    _loadCompletedIdsForSelected();
+  }
+
+  ScheduledDayPlan? _getScheduledPlan(DateTime date) =>
+      weeklySchedule[_jsDayIndex(date).toString()];
+
+  String _completionScope(DateTime date, String muscle) {
+    final plan = _getScheduledPlan(date);
+    if (plan != null && plan.type == 'workout') return 'scheduled-workout';
+    return muscle;
+  }
+
+  List<ExerciseItem> _getExercisesForSelectedDay() {
+    final plan = _getScheduledPlan(currentDate);
+    if (plan != null) return plan.type == 'rest' ? [] : plan.exercises;
+    final defaults = defaultExercisesByMuscle[selectedMuscle] ?? [];
+    return defaults.map(ExerciseItem.fromJson).toList();
+  }
+
+  Future<void> _loadCompletedIdsForSelected() async {
+    if (!mounted) return;
+    setState(() => isLoadingExercises = true);
+    final scope = _completionScope(currentDate, selectedMuscle);
+    final ids = await WorkoutApiService.getCompletedIds(currentDate, scope);
+    if (!mounted) return;
+    setState(() {
+      completedIds = ids;
+      isLoadingExercises = false;
+    });
+  }
+
+  Future<void> _toggleExercise(String exerciseId) async {
+    final next = List<String>.from(completedIds);
+    next.contains(exerciseId) ? next.remove(exerciseId) : next.add(exerciseId);
+    setState(() => completedIds = next);
+    final scope = _completionScope(currentDate, selectedMuscle);
+    await WorkoutApiService.saveCompletedIds(currentDate, scope, next);
+  }
+
+  Future<void> _loadDailyChallengeApi() async {
+    if (!mounted) return;
+    setState(() => isLoadingChallengeApi = true);
+    final data = await WorkoutApiService.getDailyChallenge();
+    if (!mounted) return;
+    setState(() {
+      dailyChallengeApi = data;
+      isLoadingChallengeApi = false;
+    });
+  }
+
+  Future<void> _completeDailyChallengeApi() async {
+    final item = dailyChallengeApi?['challenge']
+        ?? dailyChallengeApi?['daily_challenge']
+        ?? dailyChallengeApi;
+    final targetReps = int.tryParse(
+      (item?['target_reps'] ?? item?['repetitions'] ?? 10).toString(),
+    ) ?? 10;
+    final updated = await WorkoutApiService.completeDailyChallenge(targetReps);
+    if (updated != null) await _loadDailyChallengeApi();
+  }
+
   Future<void> _loadTodayWorkout() async {
     if (!mounted) return;
     setState(() => _isLoadingWorkout = true);
@@ -476,10 +617,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _generateWeekDays() {
-    DateTime start = currentDate.subtract(const Duration(days: 3));
-    weekDays = List.generate(7, (index) => start.add(Duration(days: index)));
-  }
+  Future<void> _refreshData() async => _loadTodayWorkout();
 
   void _showTimerPicker() {
     showModalBottomSheet(
@@ -544,8 +682,6 @@ class _HomeScreenState extends State<HomeScreen> {
     ).then((_) => _loadTodayWorkout());
   }
 
-  Future<void> _refreshData() async => _loadTodayWorkout();
-
   void _showChatDialog() {
     showDialog(
       context: context,
@@ -577,6 +713,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // ==================== BUILD ====================
+
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
@@ -605,6 +743,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       _buildDateSection(dayName, formattedDate),
                       const SizedBox(height: 20),
                       _buildCalendar(),
+                      // ── PERUBAHAN: filter otot + checklist ──
+                      const SizedBox(height: 20),
+                      _buildMuscleFilterRow(),
+                      const SizedBox(height: 16),
+                      _buildExerciseChecklist(),
+                      // ── END PERUBAHAN ────────────────────────
                       const SizedBox(height: 28),
                       _buildSectionTitle("Today's Activity"),
                       const SizedBox(height: 16),
@@ -676,6 +820,291 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // ==================== WIDGETS ====================
+
+  // ── PERUBAHAN 1: _buildCalendar dengan reload saat tap ──────
+  Widget _buildCalendar() {
+    return SizedBox(
+      height: 84,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        children: [
+          const SizedBox(width: 20),
+          ...List.generate(weekDays.length, (i) {
+            final date = weekDays[i];
+            final isSelected = i == selectedDayIndex;
+            return GestureDetector(
+              onTap: () {
+                setState(() {
+                  selectedDayIndex = i;
+                  currentDate = date;
+                });
+                _loadCompletedIdsForSelected(); // reload saat tanggal diganti
+              },
+              child: Container(
+                width: 68,
+                height: 84,
+                margin: const EdgeInsets.only(right: 12),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  color: isSelected ? AppColors.primary : AppColors.surface,
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      DateFormat('E').format(date),
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: isSelected ? Colors.black : AppColors.textHint,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      date.day.toString(),
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: isSelected ? Colors.black : AppColors.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+          const SizedBox(width: 20),
+        ],
+      ),
+    );
+  }
+
+  // ── PERUBAHAN 2: filter otot ────────────────────────────────
+  Widget _buildMuscleFilterRow() {
+    return SizedBox(
+      height: 44,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: muscleGroups.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 10),
+        itemBuilder: (context, index) {
+          final muscle = muscleGroups[index];
+          final isSelected = muscle == selectedMuscle;
+          return GestureDetector(
+            onTap: () {
+              setState(() => selectedMuscle = muscle);
+              _loadCompletedIdsForSelected();
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: isSelected ? AppColors.primary : Colors.transparent,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isSelected ? Colors.transparent : AppColors.border,
+                ),
+              ),
+              child: Text(
+                muscle,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: isSelected ? Colors.black : AppColors.textHint,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // ── PERUBAHAN 2: checklist exercise ────────────────────────
+  Widget _buildExerciseChecklist() {
+    if (isLoadingSchedule || isLoadingExercises) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+      );
+    }
+
+    final plan = _getScheduledPlan(currentDate);
+    if (plan?.type == 'rest') {
+      return CustomCard(
+        child: Column(
+          children: [
+            Text(
+              plan!.title,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.primary),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Hari ini dijadwalkan untuk recovery.',
+              style: AppTextStyles.bodySmall,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
+
+    final exercises = _getExercisesForSelectedDay();
+    if (exercises.isEmpty) {
+      return CustomCard(
+        child: Text(
+          plan != null
+              ? 'Belum ada exercise pada ${plan.title}.'
+              : 'Belum ada latihan $selectedMuscle pada tanggal ini.',
+          style: AppTextStyles.bodyMedium,
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
+
+    final done = exercises.where((e) => completedIds.contains(e.id)).length;
+    final total = exercises.length;
+    final percentage = total == 0 ? 0 : ((done / total) * 100).round();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('$done / $total selesai', style: AppTextStyles.bodySmall),
+            Text(
+              '$percentage%',
+              style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: LinearProgressIndicator(
+            value: total == 0 ? 0 : done / total,
+            minHeight: 8,
+            backgroundColor: AppColors.border,
+            valueColor: const AlwaysStoppedAnimation(AppColors.primary),
+          ),
+        ),
+        const SizedBox(height: 16),
+        ...exercises.map((exercise) {
+          final isDone = completedIds.contains(exercise.id);
+          return GestureDetector(
+            onTap: () => _toggleExercise(exercise.id),
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: isDone ? AppColors.primary.withOpacity(0.12) : AppColors.surface,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: isDone ? AppColors.primary : AppColors.border,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isDone ? AppColors.primary : Colors.transparent,
+                      border: Border.all(
+                        color: isDone ? AppColors.primary : AppColors.border,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: isDone
+                        ? const Icon(Icons.check, size: 16, color: Colors.black)
+                        : null,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      exercise.name,
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: AppColors.textPrimary,
+                        decoration: isDone ? TextDecoration.lineThrough : null,
+                      ),
+                    ),
+                  ),
+                  Text(exercise.target, style: AppTextStyles.bodySmall),
+                ],
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  // ── PERUBAHAN 3: Today's Activity dari API + fallback lokal ─
+  Widget _buildTodayActivitySection() {
+    if (isLoadingChallengeApi) {
+      return const CustomCard(
+        child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+      );
+    }
+
+    if (dailyChallengeApi == null) {
+      if (_todayWorkout != null) return _buildTodayWorkoutCard(_todayWorkout!);
+      return _buildEmptyWorkoutCard();
+    }
+
+    final item = dailyChallengeApi!['challenge']
+        ?? dailyChallengeApi!['daily_challenge']
+        ?? dailyChallengeApi!;
+    final isCompleted = dailyChallengeApi!['completed'] == true
+        || dailyChallengeApi!['is_completed'] == true;
+    final exerciseName = item['exercise']
+        ?? item['exercise_name']
+        ?? item['name']
+        ?? 'Daily Challenge';
+    final targetReps = item['target_reps'] ?? item['repetitions'] ?? 10;
+    final description = item['instruction']
+        ?? item['description']
+        ?? 'Selesaikan $targetReps repetisi hari ini.';
+
+    return CustomCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'TODAY',
+            style: TextStyle(
+              color: AppColors.primary,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            exerciseName.toString(),
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(description.toString(), style: AppTextStyles.bodySmall),
+          const SizedBox(height: 14),
+          CustomButton(
+            text: isCompleted ? 'Sudah selesai hari ini' : 'Selesaikan Challenge',
+            onPressed: isCompleted ? () {} : _completeDailyChallengeApi,
+            width: double.infinity,
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildDailyChallenge() {
     return SizedBox(
       height: 340,
@@ -692,7 +1121,11 @@ class _HomeScreenState extends State<HomeScreen> {
             width: 280,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(24),
-              gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: gradientColors),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: gradientColors,
+              ),
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(24),
@@ -706,15 +1139,38 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         Row(
                           children: [
-                            _buildCardChip(c['duration'], Colors.white.withOpacity(0.15), Colors.white.withOpacity(0.9), border: Colors.white.withOpacity(0.2)),
+                            _buildCardChip(
+                              c['duration'],
+                              Colors.white.withOpacity(0.15),
+                              Colors.white.withOpacity(0.9),
+                              border: Colors.white.withOpacity(0.2),
+                            ),
                             const SizedBox(width: 8),
-                            _buildCardChip(c['level'].toUpperCase(), accentColor.withOpacity(0.2), AppColors.primary, border: AppColors.primary.withOpacity(0.4)),
+                            _buildCardChip(
+                              c['level'].toUpperCase(),
+                              accentColor.withOpacity(0.2),
+                              AppColors.primary,
+                              border: AppColors.primary.withOpacity(0.4),
+                            ),
                           ],
                         ),
                         const Spacer(),
-                        Text(c['title'], style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Colors.white, height: 0.95)),
+                        Text(
+                          c['title'],
+                          style: const TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                            height: 0.95,
+                          ),
+                        ),
                         const SizedBox(height: 10),
-                        Text(c['description'], maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.75))),
+                        Text(
+                          c['description'],
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.75)),
+                        ),
                         const SizedBox(height: 16),
                         _buildChallengeCTA(accentColor, c['title'] as String, c['duration'] as String),
                       ],
@@ -737,7 +1193,10 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: border, width: 1),
       ),
-      child: Text(text, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: textColor)),
+      child: Text(
+        text,
+        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: textColor),
+      ),
     );
   }
 
@@ -781,8 +1240,21 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('START NOW', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: 1, color: accentColor)),
-                Container(width: 28, height: 28, decoration: BoxDecoration(color: accentColor, shape: BoxShape.circle), child: const Icon(Icons.arrow_forward, color: Colors.white, size: 16)),
+                Text(
+                  'START NOW',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1,
+                    color: accentColor,
+                  ),
+                ),
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(color: accentColor, shape: BoxShape.circle),
+                  child: const Icon(Icons.arrow_forward, color: Colors.white, size: 16),
+                ),
               ],
             ),
           ),
@@ -801,7 +1273,12 @@ class _HomeScreenState extends State<HomeScreen> {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: AppColors.primary.withOpacity(0.3)),
         ),
-        child: Center(child: Text("Tidak menemukan latihan mu? Chat Admin", style: TextStyle(fontSize: 13, color: AppColors.primary))),
+        child: Center(
+          child: Text(
+            "Tidak menemukan latihan mu? Chat Admin",
+            style: TextStyle(fontSize: 13, color: AppColors.primary),
+          ),
+        ),
       ),
     );
   }
@@ -821,7 +1298,11 @@ class _HomeScreenState extends State<HomeScreen> {
             onTap: () {
               setState(() {
                 selectedLevel = level;
-                _pageController.animateToPage(index, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+                _pageController.animateToPage(
+                  index,
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                );
               });
             },
             child: AnimatedContainer(
@@ -833,7 +1314,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 border: Border.all(color: isSelected ? Colors.transparent : AppColors.border),
               ),
               child: Center(
-                child: Text(level,
+                child: Text(
+                  level,
                   style: TextStyle(
                     color: isSelected ? Colors.black : AppColors.textHint,
                     fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
@@ -848,23 +1330,22 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildTodayActivitySection() {
-    if (_isLoadingWorkout) {
-      return const CustomCard(
-        child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
-      );
-    }
-    if (_todayWorkout != null) return _buildTodayWorkoutCard(_todayWorkout!);
-    return _buildEmptyWorkoutCard();
-  }
-
   Widget _buildHeader() {
     return Row(
       children: [
         Container(
-          width: 52, height: 52,
-          decoration: BoxDecoration(shape: BoxShape.circle, gradient: const LinearGradient(colors: [AppColors.primary, AppColors.primaryDark])),
-          child: Center(child: Text(_userInitial, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black))),
+          width: 52,
+          height: 52,
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(colors: [AppColors.primary, AppColors.primaryDark]),
+          ),
+          child: Center(
+            child: Text(
+              _userInitial,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
+            ),
+          ),
         ),
         const SizedBox(width: 14),
         Expanded(
@@ -878,7 +1359,11 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         GestureDetector(
           onTap: _showChatDialog,
-          child: Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(12)), child: Icon(Icons.chat_bubble_outline, size: 22, color: AppColors.primary)),
+          child: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(12)),
+            child: Icon(Icons.chat_bubble_outline, size: 22, color: AppColors.primary),
+          ),
         ),
       ],
     );
@@ -911,8 +1396,15 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildChip(String text, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(20), border: Border.all(color: color.withOpacity(0.3))),
-      child: Text(text, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: color)),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: color),
+      ),
     );
   }
 
@@ -920,52 +1412,30 @@ class _HomeScreenState extends State<HomeScreen> {
     return Center(
       child: Column(
         children: [
-          Text(dayName.toUpperCase(), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.primary, letterSpacing: 1)),
+          Text(
+            dayName.toUpperCase(),
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: AppColors.primary,
+              letterSpacing: 1,
+            ),
+          ),
           const SizedBox(height: 6),
-          Text(formattedDate, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCalendar() {
-    return SizedBox(
-      height: 84,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        children: [
-          const SizedBox(width: 20),
-          ...List.generate(weekDays.length, (i) {
-            final date = weekDays[i];
-            final isSelected = i == selectedDayIndex;
-            return GestureDetector(
-              onTap: () => setState(() { selectedDayIndex = i; currentDate = date; }),
-              child: Container(
-                width: 68, height: 84, margin: const EdgeInsets.only(right: 12),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  color: isSelected ? AppColors.primary : AppColors.surface,
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(DateFormat('E').format(date), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: isSelected ? Colors.black : AppColors.textHint)),
-                    const SizedBox(height: 6),
-                    Text(date.day.toString(), style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: isSelected ? Colors.black : AppColors.textPrimary)),
-                  ],
-                ),
-              ),
-            );
-          }),
-          const SizedBox(width: 20),
+          Text(
+            formattedDate,
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+          ),
         ],
       ),
     );
   }
 
   Widget _buildSectionTitle(String title) {
-    return Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.textPrimary));
+    return Text(
+      title,
+      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+    );
   }
 
   Widget _buildTodayWorkoutCard(WorkoutDay workout) {
@@ -976,13 +1446,27 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           Row(
             children: [
-              Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.15), borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.fitness_center, color: AppColors.primary, size: 24)),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.fitness_center, color: AppColors.primary, size: 24),
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(workout.sectionName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                    Text(
+                      workout.sectionName,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
                     const SizedBox(height: 4),
                     Text("${workout.exercises.length} exercises", style: AppTextStyles.bodySmall),
                   ],
@@ -992,11 +1476,26 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 14),
           Wrap(
-            spacing: 8, runSpacing: 8,
-            children: workout.bodyParts.map((part) => Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(8)), child: Text(part, style: const TextStyle(fontSize: 11, color: AppColors.primary)))).toList(),
+            spacing: 8,
+            runSpacing: 8,
+            children: workout.bodyParts
+                .map((part) => Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.border,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(part, style: const TextStyle(fontSize: 11, color: AppColors.primary)),
+                    ))
+                .toList(),
           ),
           const SizedBox(height: 14),
-          CustomButton(text: "Start", onPressed: () => _startWorkout(workout), isOutlined: true, width: double.infinity),
+          CustomButton(
+            text: "Start",
+            onPressed: () => _startWorkout(workout),
+            isOutlined: true,
+            width: double.infinity,
+          ),
         ],
       ),
     );
@@ -1018,7 +1517,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildTimerCard() {
     return Container(
-      decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.2), blurRadius: 12, spreadRadius: 2)]),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.2), blurRadius: 12, spreadRadius: 2)],
+      ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(20),
         child: Stack(
@@ -1034,14 +1536,35 @@ class _HomeScreenState extends State<HomeScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text("WORKOUT TIMER", style: TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                      const Text(
+                        "WORKOUT TIMER",
+                        style: TextStyle(
+                          color: AppColors.primary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1,
+                        ),
+                      ),
                       const SizedBox(height: 4),
-                      Text(_isTimerSet ? Formatter.formatTimer(_timerMinutes, _timerSeconds) : "00:00", style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                      Text(
+                        _isTimerSet
+                            ? Formatter.formatTimer(_timerMinutes, _timerSeconds)
+                            : "00:00",
+                        style: const TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
                     ],
                   ),
                   OutlinedButton(
                     onPressed: _showTimerPicker,
-                    style: OutlinedButton.styleFrom(foregroundColor: AppColors.textPrimary, side: const BorderSide(color: AppColors.primary, width: 1.5), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(40))),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.textPrimary,
+                      side: const BorderSide(color: AppColors.primary, width: 1.5),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(40)),
+                    ),
                     child: const Text("SET", style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
                 ],
@@ -1055,11 +1578,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildWorkoutCard(Map<String, String> workout) {
     final level = workout["level"]!;
-    final levelColor = level == "Beginner" ? AppColors.blue : level == "Intermediate" ? AppColors.purple : AppColors.red;
+    final levelColor = level == "Beginner"
+        ? AppColors.blue
+        : level == "Intermediate"
+            ? AppColors.purple
+            : AppColors.red;
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
-      decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: levelColor.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4))]),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(color: levelColor.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4))],
+      ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(20),
         child: Column(
@@ -1067,9 +1597,46 @@ class _HomeScreenState extends State<HomeScreen> {
             Stack(
               children: [
                 Image.asset(workout["image"]!, height: 140, width: double.infinity, fit: BoxFit.cover),
-                Container(height: 140, decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, Colors.black.withOpacity(0.7)]))),
-                Positioned(top: 12, right: 12, child: Container(width: 36, height: 36, decoration: BoxDecoration(color: levelColor.withOpacity(0.2), borderRadius: BorderRadius.circular(18), border: Border.all(color: levelColor, width: 1.5)), child: const Icon(Icons.flash_on, color: Colors.white, size: 18))),
-                Positioned(bottom: 12, left: 12, child: Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5), decoration: BoxDecoration(color: levelColor, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: levelColor, blurRadius: 6, spreadRadius: 1)]), child: Text(level, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)))),
+                Container(
+                  height: 140,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Colors.transparent, Colors.black.withOpacity(0.7)],
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: levelColor.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: levelColor, width: 1.5),
+                    ),
+                    child: const Icon(Icons.flash_on, color: Colors.white, size: 18),
+                  ),
+                ),
+                Positioned(
+                  bottom: 12,
+                  left: 12,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: levelColor,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [BoxShadow(color: levelColor, blurRadius: 6, spreadRadius: 1)],
+                    ),
+                    child: Text(
+                      level,
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                  ),
+                ),
               ],
             ),
             Container(
@@ -1078,7 +1645,10 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(workout["title"]!, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                  Text(
+                    workout["title"]!,
+                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                  ),
                   const SizedBox(height: 10),
                   Row(
                     children: [
@@ -1119,7 +1689,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildSportyIcon(IconData icon, String text, Color color) {
-    return Row(children: [Icon(icon, size: 14, color: color), const SizedBox(width: 6), Text(text, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary))]);
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: color),
+        const SizedBox(width: 6),
+        Text(text, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+      ],
+    );
   }
 
   @override
@@ -1129,6 +1705,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
+// ==================== PAINTER ====================
+
 class _CardGeoPainter extends CustomPainter {
   final Color accentColor;
   const _CardGeoPainter({required this.accentColor});
@@ -1136,26 +1714,65 @@ class _CardGeoPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final w = size.width, h = size.height;
-    final circlePaint = Paint()..color = Colors.white.withOpacity(0.06)..style = PaintingStyle.stroke..strokeWidth = 36;
+    final circlePaint = Paint()
+      ..color = Colors.white.withOpacity(0.06)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 36;
     canvas.drawCircle(Offset(w * 0.85, h * 0.22), w * 0.52, circlePaint);
-    final circlePaint2 = Paint()..color = Colors.white.withOpacity(0.04)..style = PaintingStyle.stroke..strokeWidth = 1.5;
+    final circlePaint2 = Paint()
+      ..color = Colors.white.withOpacity(0.04)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
     canvas.drawCircle(Offset(w * 0.85, h * 0.22), w * 0.34, circlePaint2);
-    final bandPaint = Paint()..color = Colors.white.withOpacity(0.055)..style = PaintingStyle.fill;
-    final band1 = Path()..moveTo(0, h * 0.62)..lineTo(w * 0.28, h * 0.38)..lineTo(w * 0.28 + 18, h * 0.38)..lineTo(18, h * 0.62)..close();
+    final bandPaint = Paint()
+      ..color = Colors.white.withOpacity(0.055)
+      ..style = PaintingStyle.fill;
+    final band1 = Path()
+      ..moveTo(0, h * 0.62)
+      ..lineTo(w * 0.28, h * 0.38)
+      ..lineTo(w * 0.28 + 18, h * 0.38)
+      ..lineTo(18, h * 0.62)
+      ..close();
     canvas.drawPath(band1, bandPaint);
     final band2 = Paint()..color = Colors.white.withOpacity(0.035);
-    final band2Path = Path()..moveTo(0, h * 0.70)..lineTo(w * 0.22, h * 0.50)..lineTo(w * 0.22 + 12, h * 0.50)..lineTo(12, h * 0.70)..close();
+    final band2Path = Path()
+      ..moveTo(0, h * 0.70)
+      ..lineTo(w * 0.22, h * 0.50)
+      ..lineTo(w * 0.22 + 12, h * 0.50)
+      ..lineTo(12, h * 0.70)
+      ..close();
     canvas.drawPath(band2Path, band2..style = PaintingStyle.fill);
-    final dotPaint = Paint()..color = Colors.white.withOpacity(0.12)..style = PaintingStyle.fill;
-    for (int row = 0; row < 3; row++) for (int col = 0; col < 3; col++) canvas.drawCircle(Offset(22.0 + col * 18, 26.0 + row * 18), 2.2, dotPaint);
-    final barPaint = Paint()..color = accentColor.withOpacity(0.5)..strokeCap = StrokeCap.round..style = PaintingStyle.fill;
-    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(0, h * 0.77, w * 0.38, 4), const Radius.circular(2)), barPaint);
-    final crossPaint = Paint()..color = Colors.white.withOpacity(0.2)..strokeWidth = 1.8..strokeCap = StrokeCap.round;
+    final dotPaint = Paint()
+      ..color = Colors.white.withOpacity(0.12)
+      ..style = PaintingStyle.fill;
+    for (int row = 0; row < 3; row++) {
+      for (int col = 0; col < 3; col++) {
+        canvas.drawCircle(Offset(22.0 + col * 18, 26.0 + row * 18), 2.2, dotPaint);
+      }
+    }
+    final barPaint = Paint()
+      ..color = accentColor.withOpacity(0.5)
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.fill;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(Rect.fromLTWH(0, h * 0.77, w * 0.38, 4), const Radius.circular(2)),
+      barPaint,
+    );
+    final crossPaint = Paint()
+      ..color = Colors.white.withOpacity(0.2)
+      ..strokeWidth = 1.8
+      ..strokeCap = StrokeCap.round;
     canvas.drawLine(Offset(w * 0.88, h * 0.87), Offset(w * 0.96, h * 0.87), crossPaint);
     canvas.drawLine(Offset(w * 0.92, h * 0.83), Offset(w * 0.92, h * 0.91), crossPaint);
-    final linePaint = Paint()..color = AppColors.primary.withOpacity(0.15)..strokeWidth = 2.0..strokeCap = StrokeCap.round;
+    final linePaint = Paint()
+      ..color = AppColors.primary.withOpacity(0.15)
+      ..strokeWidth = 2.0
+      ..strokeCap = StrokeCap.round;
     canvas.drawLine(Offset(w * 0.60, h * 0.08), Offset(w * 0.82, h * 0.02), linePaint);
-    final linePaint2 = Paint()..color = AppColors.primary.withOpacity(0.08)..strokeWidth = 1.5..strokeCap = StrokeCap.round;
+    final linePaint2 = Paint()
+      ..color = AppColors.primary.withOpacity(0.08)
+      ..strokeWidth = 1.5
+      ..strokeCap = StrokeCap.round;
     canvas.drawLine(Offset(w * 0.63, h * 0.12), Offset(w * 0.88, h * 0.06), linePaint2);
   }
 

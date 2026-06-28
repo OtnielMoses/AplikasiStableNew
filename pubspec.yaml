@@ -10,11 +10,16 @@ dependencies:
   flutter:
     sdk: flutter
   google_fonts: ^6.1.0
-  http: ^1.6.0
-  image_picker: ^1.0.0
-  shared_preferences: ^2.2.2
   intl: ^0.18.0
   cupertino_icons: ^1.0.6
+  http: ^1.2.2
+  image_picker: ^1.1.2
+  shared_preferences: ^2.2.3
+  flutter_web_auth_2: ^4.1.0
+  webview_flutter: ^4.8.0
+  web_socket_channel: ^3.0.1
+  url_launcher: ^6.3.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

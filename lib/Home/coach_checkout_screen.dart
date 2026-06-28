@@ -1,14 +1,17 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:stable_app/core/constants/app_colors.dart';
-import 'package:stable_app/core/constants/app_text_styles.dart';
-import 'package:stable_app/core/utils/formatter.dart';
-import 'package:stable_app/core/widgets/common/custom_button.dart';
+import 'package:webview_flutter/webview_flutter.dart';
+
+import '../config.dart';
 import 'personal_trainer_screen.dart';
-import 'coach_chat_screen.dart';
 
 class CoachCheckoutScreen extends StatefulWidget {
   final Coach coach;
+
   const CoachCheckoutScreen({super.key, required this.coach});
 
   @override
@@ -16,332 +19,222 @@ class CoachCheckoutScreen extends StatefulWidget {
 }
 
 class _CoachCheckoutScreenState extends State<CoachCheckoutScreen> {
-  final int price = 20000; // fixed 20k
+  WebViewController? _webViewController;
+  Timer? _pollingTimer;
+  int? _sessionId;
+  bool _loading = true;
+  String _message = 'Membuat pembayaran...';
+
+  @override
+  void initState() {
+    super.initState();
+    _createCheckout();
+  }
+
+  @override
+  void dispose() {
+    _pollingTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _createCheckout() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getInt('user_id') ??
+          int.tryParse(prefs.getString('user_id') ?? '');
+      final name = prefs.getString('name') ??
+          prefs.getString('username') ??
+          'User STABLE';
+      final email = prefs.getString('email') ?? '';
+
+      if (userId == null) {
+        throw Exception('Silakan login ulang sebelum membeli sesi.');
+      }
+
+      final response = await http.post(
+        Uri.parse('${AppConfig.baseUrl}/trainer-chat/checkout'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'user_id': userId,
+          'trainer_id': widget.coach.id,
+          'customer_name': name,
+          'customer_email': email,
+        }),
+      );
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception(
+            body['message'] ?? body['error'] ?? 'Gagal membuat pembayaran.');
+      }
+
+      final data = body['data'] ?? body;
+      final redirectUrl = '${data['redirect_url'] ?? ''}';
+      _sessionId = _toInt(data['session_id']);
+
+      if (_sessionId == null || redirectUrl.isEmpty) {
+        throw Exception('Data pembayaran dari server tidak lengkap.');
+      }
+
+      final controller = WebViewController()
+        ..setJavaScriptMode(JavaScriptMode.unrestricted)
+        ..setNavigationDelegate(
+          NavigationDelegate(
+            onPageFinished: (_) => _checkSessionStatus(),
+            onWebResourceError: (_) {
+              _checkSessionStatus();
+            },
+            onNavigationRequest: (request) {
+              final url = request.url;
+
+              final isFinishRedirect = url.contains('127.0.0.1:5501') ||
+                  url.contains('localhost:5501') ||
+                  url.contains('/page/trainer.html') ||
+                  url.contains('order_id=');
+
+              if (isFinishRedirect) {
+                setState(() {
+                  _message = 'Pembayaran terdeteksi. Memverifikasi status...';
+                  _loading = true;
+                });
+
+                _markSessionPaidForDev().then((_) => _checkSessionStatus());
+
+                return NavigationDecision.prevent;
+              }
+
+              return NavigationDecision.navigate;
+            },
+          ),
+        )
+        ..loadRequest(Uri.parse(redirectUrl));
+
+      _startPolling();
+
+      if (!mounted) return;
+      setState(() {
+        _webViewController = controller;
+        _loading = false;
+        _message = 'Selesaikan pembayaran Midtrans.';
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _message = error.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  void _startPolling() {
+    _pollingTimer?.cancel();
+    _pollingTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      _checkSessionStatus();
+    });
+  }
+
+  Future<void> _markSessionPaidForDev() async {
+    final sessionId = _sessionId;
+    if (sessionId == null) return;
+
+    await http.post(
+      Uri.parse(
+          '${AppConfig.baseUrl}/trainer-chat/sessions/$sessionId/dev-paid'),
+    );
+  }
+
+  Future<void> _checkSessionStatus() async {
+    final sessionId = _sessionId;
+    if (sessionId == null) return;
+
+    try {
+      final response = await http.get(
+        Uri.parse('${AppConfig.baseUrl}/trainer-chat/sessions/$sessionId'),
+      );
+      if (response.statusCode < 200 || response.statusCode >= 300) return;
+
+      final body = jsonDecode(response.body);
+      final data = body['data'] ?? body;
+      final status = '${data['status'] ?? ''}'.toLowerCase();
+
+      if (status != 'paid') return;
+
+      final expiresAtRaw = data['expires_at'];
+      final expiresAt = expiresAtRaw == null || '$expiresAtRaw'.isEmpty
+          ? DateTime.now().add(const Duration(minutes: 10))
+          : DateTime.parse('$expiresAtRaw');
+
+      _pollingTimer?.cancel();
+      if (!mounted) return;
+
+      Navigator.pop(
+        context,
+        ActiveChatSession(
+          sessionId: sessionId,
+          trainerId: _toInt(data['trainer_id']) ?? widget.coach.id,
+          trainerName: '${data['trainer_name'] ?? widget.coach.name}',
+          trainerSpecialty:
+              '${data['trainer_specialty'] ?? widget.coach.specialty}',
+          expiresAt: expiresAt,
+        ),
+      );
+    } catch (_) {
+      return;
+    }
+  }
+
+  int? _toInt(dynamic value) {
+    if (value is int) return value;
+    return int.tryParse('$value');
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: const Color(0xFF06141B),
       appBar: AppBar(
-        title: const Text("Hire Coach"),
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, size: 20),
-          onPressed: () => Navigator.pop(context, false), // return false jika batal
-        ),
+        backgroundColor: const Color(0xFF06141B),
+        elevation: 0,
+        title: const Text('Payment', style: TextStyle(color: Colors.white)),
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildCoachCard(),
-            const SizedBox(height: 24),
-            _buildPriceSection(),
-            const SizedBox(height: 24),
-            _buildPaymentMethodSection(),
-            const Spacer(),
-            CustomButton(
-              text: "Pay Now",
-              onPressed: () => _showPaymentDialog(context),
-              width: double.infinity,
-            ),
-            const SizedBox(height: 16),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCoachCard() {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A1C24),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFF2A2D35)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.grey[800],
-              ),
-              child: const Icon(Icons.person, size: 32, color: Colors.white),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
+      body: _loading
+          ? Center(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    widget.coach.name,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    widget.coach.specialty,
-                    style: const TextStyle(
-                      color: Color(0xFFD4FF33),
-                      fontSize: 14,
-                    ),
-                  ),
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 16),
+                  Text(_message,
+                      style: const TextStyle(color: Color(0xFF9BA8AB))),
                 ],
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPriceSection() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          const Text(
-            "Consultation Fee",
-            style: AppTextStyles.bodyLarge,
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                Formatter.formatPrice(price),
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.primary,
-                ),
-              ),
-              Text(
-                "15 min session",
-                style: AppTextStyles.caption,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPaymentMethodSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          "Payment Method",
-          style: AppTextStyles.bodyLarge,
-        ),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Center(
-                  child: Icon(Icons.qr_code_scanner, size: 28, color: Colors.black),
-                ),
-              ),
-              const SizedBox(width: 14),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "QRIS",
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                    ),
-                    SizedBox(height: 2),
-                    Text(
-                      "Scan QR code with any payment app",
-                      style: TextStyle(fontSize: 12, color: AppColors.textHint),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                width: 24,
-                height: 24,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.primary,
-                ),
-                child: const Icon(Icons.check, size: 14, color: Colors.black),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  void _showPaymentDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.qr_code_scanner, color: AppColors.primary, size: 24),
-            ),
-            const SizedBox(width: 12),
-            const Text(
-              "Payment QRIS",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 200,
-              height: 200,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: const Center(
-                child: Icon(Icons.qr_code, size: 160, color: Colors.black),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.border,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.info_outline, size: 16, color: AppColors.primary),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      "Scan this QR code using your payment app to complete transaction",
-                      style: AppTextStyles.bodySmall,
+            )
+          : _webViewController == null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.error_outline,
+                            color: Colors.white, size: 48),
+                        const SizedBox(height: 14),
+                        Text(
+                          _message,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                        const SizedBox(height: 18),
+                        ElevatedButton(
+                          onPressed: _createCheckout,
+                          child: const Text('Coba Lagi'),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _showSuccessDialog(context);
-            },
-            child: const Text("I've Paid", style: TextStyle(fontWeight: FontWeight.w600)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel", style: TextStyle(color: AppColors.textHint)),
-          ),
-        ],
-      ),
+                )
+              : WebViewWidget(controller: _webViewController!),
     );
-  }
-
-  void _showSuccessDialog(BuildContext context) {
-    _setSessionActive();
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.check_circle, color: AppColors.primary, size: 28),
-            ),
-            const SizedBox(width: 12),
-            const Text(
-              "Payment Successful!",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              "You've hired ${widget.coach.name}.",
-              style: AppTextStyles.bodyMedium,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              "You will be connected to chat. Session lasts 15 minutes.",
-              style: AppTextStyles.bodySmall,
-            ),
-          ],
-        ),
-        actions: [
-          CustomButton(
-            text: "Start Chat",
-            onPressed: () {
-              // Kembalikan true ke halaman sebelumnya (PersonalTrainerScreen) agar refresh
-              Navigator.pop(context, true); // tutup dialog sukses
-              // Navigasi ke chat screen
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => CoachChatScreen(
-                    coach: widget.coach,
-                    sessionDuration: const Duration(minutes: 15),
-                    isResuming: false,
-                  ),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _setSessionActive() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('isChatSessionActive', true);
-    await prefs.setString('currentCoachId', widget.coach.id);
   }
 }
